@@ -10,6 +10,21 @@ import PDFKit
 
 // MARK: - 1. Модели данных ═══════════════════════════════════════
 
+private extension String {
+    var scheduleTrimmed: String {
+        components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var cleanedDateToken: String {
+        replacingOccurrences(of: " ", with: "")
+            .replacingOccurrences(of: "\n", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
 enum Weekday: Int, Codable, CaseIterable, Comparable {
     case monday = 0
     case tuesday, wednesday, thursday, friday, saturday
@@ -53,7 +68,46 @@ struct DateRange: Codable, Equatable {
     let isEveryWeek: Bool
     let isBiweekly: Bool
 
-    func expand(academicYear: Int) -> [Date] {
+    init(start: String, end: String?, isEveryWeek: Bool, isBiweekly: Bool) {
+        self.start = start.cleanedDateToken
+        self.end = end?.cleanedDateToken
+        self.isEveryWeek = isEveryWeek
+        self.isBiweekly = isBiweekly
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case start
+        case end
+        case isEveryWeek
+        case isBiweekly
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let startRaw = try container.decode(String.self, forKey: .start)
+        let endRaw = try container.decodeIfPresent(String.self, forKey: .end)
+        let decodedBiweekly = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .isBiweekly
+        )
+        let decodedEveryWeek = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .isEveryWeek
+        )
+
+        let hasRangeEnd = (endRaw?.cleanedDateToken.isEmpty == false)
+        let biweekly = decodedBiweekly ?? false
+        let everyWeek = decodedEveryWeek ?? (hasRangeEnd && !biweekly)
+
+        self.init(
+            start: startRaw,
+            end: endRaw,
+            isEveryWeek: everyWeek,
+            isBiweekly: biweekly
+        )
+    }
+
+    func expand(academicYear: Int, forceBiweekly: Bool = false) -> [Date] {
         let cal = Calendar(identifier: .gregorian)
         let fmt = DateFormatter()
         fmt.dateFormat = "dd.MM.yyyy"
@@ -76,7 +130,7 @@ struct DateRange: Codable, Equatable {
             )
         else { return [startDate] }
 
-        let step = isBiweekly ? 14 : 7
+        let step = (isBiweekly || (isEveryWeek && forceBiweekly)) ? 14 : 7
         var dates: [Date] = []
         var current = startDate
         while current <= endDate {
@@ -122,6 +176,86 @@ struct ScheduleEntry: Codable, Identifiable {
     let slotEnd: Int
     let dates: [DateRange]
 
+    enum CodingKeys: String, CodingKey {
+        case id
+        case subject
+        case teacher
+        case classType
+        case subgroup
+        case room
+        case weekday
+        case slotStart
+        case slotEnd
+        case dates
+    }
+
+    init(
+        id: String,
+        subject: String,
+        teacher: String?,
+        classType: ClassType,
+        subgroup: Subgroup,
+        room: String?,
+        weekday: Weekday,
+        slotStart: Int,
+        slotEnd: Int,
+        dates: [DateRange]
+    ) {
+        self.id = id
+        self.subject = Self.normalizeSubject(subject)
+        self.teacher = teacher?.scheduleTrimmed
+        let normalizedRoom = room?.scheduleTrimmed
+        self.room =
+            (normalizedRoom?.isEmpty == false) ? normalizedRoom : nil
+        self.classType = classType
+        self.subgroup = subgroup
+        self.weekday = weekday
+        self.slotStart = slotStart
+        self.slotEnd = slotEnd
+        self.dates = dates
+    }
+
+    private static func normalizeSubject(_ raw: String) -> String {
+        var value = raw.scheduleTrimmed
+        while value.hasPrefix(".") || value.hasPrefix(",") {
+            value = String(value.dropFirst()).trimmingCharacters(in: .whitespaces)
+        }
+        while value.hasSuffix(".") || value.hasSuffix(",") {
+            value = String(value.dropLast()).trimmingCharacters(in: .whitespaces)
+        }
+        return value.isEmpty ? "Без названия" : value
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let id = try container.decodeIfPresent(String.self, forKey: .id)
+            ?? UUID().uuidString
+        let subject = try container.decode(String.self, forKey: .subject)
+        let teacher = try container.decodeIfPresent(String.self, forKey: .teacher)
+        let classType = try container.decode(ClassType.self, forKey: .classType)
+        let subgroup = try container.decodeIfPresent(Subgroup.self, forKey: .subgroup)
+            ?? .all
+        let room = try container.decodeIfPresent(String.self, forKey: .room)
+        let weekday = try container.decode(Weekday.self, forKey: .weekday)
+        let slotStart = try container.decode(Int.self, forKey: .slotStart)
+        let slotEnd =
+            try container.decodeIfPresent(Int.self, forKey: .slotEnd) ?? slotStart
+        let dates = try container.decode([DateRange].self, forKey: .dates)
+
+        self.init(
+            id: id,
+            subject: subject,
+            teacher: teacher,
+            classType: classType,
+            subgroup: subgroup,
+            room: room,
+            weekday: weekday,
+            slotStart: slotStart,
+            slotEnd: slotEnd,
+            dates: dates
+        )
+    }
+
     var isRemote: Bool { room == nil }
 
     var timeString: String {
@@ -153,6 +287,7 @@ struct GroupSchedule: Codable {
             }()
 
         let target = cal.startOfDay(for: date)
+        let alternatingLabIDs = detectAlternatingLabEntries()
 
         return
             entries
@@ -161,10 +296,86 @@ struct GroupSchedule: Codable {
                 subgroup == .all || e.subgroup == .all || e.subgroup == subgroup
             }
             .filter { e in
-                e.dates.flatMap { $0.expand(academicYear: year) }
+                let forceBiweekly = alternatingLabIDs.contains(e.id)
+                return e.dates.flatMap {
+                    $0.expand(
+                        academicYear: year,
+                        forceBiweekly: forceBiweekly
+                    )
+                }
                     .contains { cal.startOfDay(for: $0) == target }
             }
             .sorted { $0.slotStart < $1.slotStart }
+    }
+
+    private func detectAlternatingLabEntries() -> Set<String> {
+        let subgroupLabs = entries.filter {
+            $0.classType == .lab && $0.subgroup != .all
+        }
+        guard !subgroupLabs.isEmpty else { return [] }
+
+        var result: Set<String> = []
+
+        for lhs in subgroupLabs {
+            let oppositeSubgroup: Subgroup = lhs.subgroup == .a ? .b : .a
+
+            let matchingPartners = subgroupLabs.filter {
+                $0.id != lhs.id
+                    && $0.weekday == lhs.weekday
+                    && $0.slotStart == lhs.slotStart
+                    && $0.slotEnd == lhs.slotEnd
+                    && $0.subgroup == oppositeSubgroup
+            }
+
+            guard !matchingPartners.isEmpty else { continue }
+
+            for rhs in matchingPartners {
+                if hasWeekShiftBetweenSubgroups(lhs, rhs) {
+                    result.insert(lhs.id)
+                    result.insert(rhs.id)
+                }
+            }
+        }
+
+        return result
+    }
+
+    private func hasWeekShiftBetweenSubgroups(
+        _ lhs: ScheduleEntry,
+        _ rhs: ScheduleEntry
+    ) -> Bool {
+        for l in lhs.dates where l.end != nil && l.isEveryWeek && !l.isBiweekly {
+            for r in rhs.dates where r.end != nil && r.isEveryWeek && !r.isBiweekly
+            {
+                guard let delta = dayDelta(l.start, r.start) else { continue }
+                if abs(delta) == 7 { return true }
+            }
+        }
+        return false
+    }
+
+    private func dayDelta(_ lhs: String, _ rhs: String) -> Int? {
+        func makeDate(from token: String) -> Date? {
+            let cleaned = token.cleanedDateToken
+            let parts = cleaned.split(separator: ".")
+            guard parts.count >= 2,
+                let day = Int(parts[0]),
+                let month = Int(parts[1])
+            else { return nil }
+
+            var components = DateComponents()
+            components.calendar = Calendar(identifier: .gregorian)
+            components.year = 2001
+            components.month = month
+            components.day = day
+            return components.date
+        }
+
+        guard let leftDate = makeDate(from: lhs), let rightDate = makeDate(from: rhs)
+        else { return nil }
+
+        return Calendar(identifier: .gregorian)
+            .dateComponents([.day], from: leftDate, to: rightDate).day
     }
 }
 
@@ -568,6 +779,11 @@ struct CellTextParser {
         .replacingOccurrences(of: "\n", with: " ")
         .replacingOccurrences(of: "  ", with: " ")
         .trimmingCharacters(in: .whitespacesAndNewlines)
+        while subject.hasPrefix(".") || subject.hasPrefix(",") {
+            subject = String(subject.dropFirst()).trimmingCharacters(
+                in: .whitespaces
+            )
+        }
         while subject.hasSuffix(".") || subject.hasSuffix(",") {
             subject = String(subject.dropLast()).trimmingCharacters(
                 in: .whitespaces
@@ -596,20 +812,43 @@ struct CellTextParser {
         classType: ClassType,
         subgroup: Subgroup
     ) -> String? {
+        // Если явной аудитории нет, считаем пару дистанционной.
         var s = text
         guard let r = s.range(of: classType.rawValue) else { return nil }
         s = String(s[r.upperBound...])
         if subgroup != .all, let sr = s.range(of: "(\(subgroup.rawValue))") {
             s = String(s[sr.upperBound...])
         }
+        if let teacher = teacherRe.firstMatch(
+            in: s,
+            range: NSRange(location: 0, length: (s as NSString).length)
+        ) {
+            s = (s as NSString).replacingCharacters(in: teacher.range, with: "")
+        }
+
         let ns = s as NSString
         let c = datesRe.stringByReplacingMatches(
             in: s,
             range: NSRange(location: 0, length: ns.length),
             withTemplate: ""
         )
-        let room = c.trimmingCharacters(in: .whitespacesAndNewlines)
-            .trimmingCharacters(in: CharacterSet(charactersIn: ". ,"))
+        let normalized = c.scheduleTrimmed.lowercased()
+        if normalized.contains("дист") || normalized.contains("online") {
+            return nil
+        }
+
+        let roomRegex = try? NSRegularExpression(
+            pattern: #"(Фрезер\s*С\/З\s*\d+|\b\d{3,4}(?:\([а-яА-Яa-zA-Z]\))?\b)"#
+        )
+
+        guard let roomRegex,
+            let match = roomRegex.firstMatch(
+                in: c,
+                range: NSRange(location: 0, length: (c as NSString).length)
+            )
+        else { return nil }
+
+        let room = (c as NSString).substring(with: match.range).scheduleTrimmed
         return room.isEmpty ? nil : room
     }
 
@@ -624,7 +863,7 @@ struct CellTextParser {
                 .trimmingCharacters(in: .whitespaces)
             if c.contains("-") {
                 let pts = c.split(separator: "-").map {
-                    String($0).trimmingCharacters(in: .whitespaces)
+                    String($0).cleanedDateToken
                 }
                 guard pts.count == 2 else { return nil }
                 return DateRange(
@@ -635,7 +874,7 @@ struct CellTextParser {
                 )
             }
             return DateRange(
-                start: c,
+                start: c.cleanedDateToken,
                 end: nil,
                 isEveryWeek: false,
                 isBiweekly: false
