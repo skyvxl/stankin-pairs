@@ -887,19 +887,29 @@ struct CellTextParser {
 
 struct PDFScheduleParser {
 
-    static func parse(pdfURL: URL) -> GroupSchedule? {
-        guard let doc = PDFDocument(url: pdfURL), let page = doc.page(at: 0)
-        else { return nil }
-        return parse(page: page)
+    nonisolated static func parse(pdfURL: URL) -> GroupSchedule? {
+        guard let doc = PDFDocument(url: pdfURL) else { return nil }
+        return parse(document: doc)
     }
 
-    static func parse(pdfData: Data) -> GroupSchedule? {
-        guard let doc = PDFDocument(data: pdfData), let page = doc.page(at: 0)
-        else { return nil }
-        return parse(page: page)
+    nonisolated static func parse(pdfData: Data) -> GroupSchedule? {
+        guard let doc = PDFDocument(data: pdfData) else { return nil }
+        return parse(document: doc)
     }
 
-    static func parse(page: PDFPage) -> GroupSchedule? {
+    nonisolated static func parse(document: PDFDocument) -> GroupSchedule? {
+        guard document.pageCount > 0 else { return nil }
+
+        for pageIndex in 0..<document.pageCount {
+            guard let page = document.page(at: pageIndex) else { continue }
+            if let schedule = parse(page: page), !schedule.entries.isEmpty {
+                return schedule
+            }
+        }
+        return nil
+    }
+
+    nonisolated static func parse(page: PDFPage) -> GroupSchedule? {
         guard let grid = GridDetector.detect(page: page) else { return nil }
 
         let cells = CellExtractor.extractAll(from: page, grid: grid)
