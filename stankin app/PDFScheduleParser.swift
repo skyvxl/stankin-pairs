@@ -390,11 +390,16 @@ struct ScheduleGrid {
     let pageHeight: CGFloat
 
     /// CGRect ячейки в PDF-координатах (bottom-up) для selection.
-    /// Добавляем 3px padding по горизонтали чтобы не терять текст на границах.
+    /// Левый край: -3px padding (текст может начинаться чуть левее границы столбца).
+    /// Правый край: +3px только для merged ячеек (внешний край диапазона);
+    ///   для одиночных ячеек правый padding не добавляем — иначе 3px с правой стороны
+    ///   col N перекрывается с 3px с левой стороны col N+1, что даёт 6px overlap
+    ///   и приводит к ложному срабатыванию merge-логики.
     func pdfRect(row: Int, colStart: Int, colEnd: Int) -> CGRect {
-        let hPad: CGFloat = 3.0
-        let x0 = columnEdges[colStart] - hPad
-        let x1 = columnEdges[colEnd + 1] + hPad
+        let leftPad: CGFloat = 3.0
+        let rightPad: CGFloat = (colStart == colEnd) ? 0.0 : 3.0
+        let x0 = columnEdges[colStart] - leftPad
+        let x1 = columnEdges[colEnd + 1] + rightPad
         let topY = rowEdges[row]
         let botY = rowEdges[row + 1]
         // top-down → PDF bottom-up
@@ -615,6 +620,16 @@ struct CellExtractor {
                     continue
                 }
 
+                // Пропускаем ячейки, содержащие только пунктуацию/пробелы —
+                // это артефакты от соседнего столбца, а не реальный контент.
+                let stripped = text.trimmingCharacters(
+                    in: .whitespacesAndNewlines.union(.punctuationCharacters)
+                )
+                if stripped.isEmpty {
+                    col += 1
+                    continue
+                }
+
                 let openCount = text.filter({ $0 == "[" }).count
                 let closeCount = text.filter({ $0 == "]" }).count
                 let balanced = openCount == closeCount && openCount > 0
@@ -630,28 +645,86 @@ struct CellExtractor {
                         colStart: col,
                         colEnd: col + 1
                     )
-                    let mergedText = extractText(from: page, rect: mergedRect)
 
-                    let mergedOpen = mergedText.filter({ $0 == "[" }).count
-                    let mergedClose = mergedText.filter({ $0 == "]" }).count
-                    let mergedBalanced =
-                        mergedOpen == mergedClose && mergedOpen > 0
+                    // Анализ физических позиций строк в PDF:
+                    // Извлекаем текст из merged-области и разделяем по
+                    // X-позиции — строки, начинающиеся левее границы
+                    // col+1, принадлежат текущему столбцу; правее — col+1.
+                    // Это надёжно отличает overflow (текст вылез за границу
+                    // ячейки) от настоящего merge (контент на 2 тайм-слота).
+                    if let mergedSel = page.selection(for: mergedRect) {
+                        let boundary = grid.columnEdges[col + 1]
+                        let lines = mergedSel.selectionsByLine()
 
-                    // Используем merged если:
-                    //   - merged сбалансирован, а одиночный нет
-                    //   - или merged содержит больше полных [...] блоков
-                    if (mergedBalanced && !balanced) || mergedClose > closeCount
-                    {
-                        cells.append(
-                            TableCell(
-                                weekday: weekday,
-                                slotStart: col,
-                                slotEnd: col + 1,
-                                text: mergedText
+                        var colLines: [String] = []
+                        var nextColLines: [String] = []
+
+                        for lineSel in lines {
+                            let b = lineSel.bounds(for: page)
+                            if b.origin.x < boundary - 2 {
+                                if let s = lineSel.string {
+                                    colLines.append(s)
+                                }
+                            } else {
+                                if let s = lineSel.string {
+                                    nextColLines.append(s)
+                                }
+                            }
+                        }
+
+                        let nextJoined = nextColLines
+                            .joined(separator: "\n")
+                        let nextClean = nextJoined
+                            .trimmingCharacters(
+                                in: .whitespacesAndNewlines
+                                    .union(.punctuationCharacters)
                             )
-                        )
-                        col += 2
-                        continue
+
+                        if !nextClean.isEmpty {
+                            // col+1 имеет свой контент → overflow.
+                            // Используем полный текст (не обрезанный)
+                            // из line-split, а не из rawTexts.
+                            let colFullText = colLines
+                                .joined(separator: "\n")
+                            cells.append(
+                                TableCell(
+                                    weekday: weekday,
+                                    slotStart: col,
+                                    slotEnd: col,
+                                    text: colFullText
+                                )
+                            )
+                            // Обновляем rawTexts для col+1:
+                            // оригинал загрязнён overflow от col,
+                            // заменяем на чистый текст из line-split.
+                            rawTexts[row][col + 1] = nextJoined
+                            col += 1
+                            continue
+                        }
+
+                        // col+1 пуст → настоящий merge (лаба на 2 пары).
+                        let mergedText = mergedSel.string ?? ""
+                        let mOpen = mergedText
+                            .filter({ $0 == "[" }).count
+                        let mClose = mergedText
+                            .filter({ $0 == "]" }).count
+                        let mBalanced =
+                            mOpen == mClose && mOpen > 0
+
+                        if !balanced
+                            && (mBalanced || mClose > closeCount)
+                        {
+                            cells.append(
+                                TableCell(
+                                    weekday: weekday,
+                                    slotStart: col,
+                                    slotEnd: col + 1,
+                                    text: mergedText
+                                )
+                            )
+                            col += 2
+                            continue
+                        }
                     }
                 }
 
