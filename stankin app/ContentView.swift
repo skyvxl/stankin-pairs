@@ -80,17 +80,21 @@ struct ContentView: View {
                     guard let first = files.first else { return }
                     store.importSchedule(from: first)
                 case .failure(let error):
-                    store.errorMessage = "Не удалось открыть файл: \(error.localizedDescription)"
+                    store.errorMessage =
+                        "Не удалось открыть файл: \(error.localizedDescription)"
                 }
             }
-            .alert("Ошибка", isPresented: Binding(
-                get: { store.errorMessage != nil },
-                set: { newValue in
-                    if !newValue {
-                        store.errorMessage = nil
+            .alert(
+                "Ошибка",
+                isPresented: Binding(
+                    get: { store.errorMessage != nil },
+                    set: { newValue in
+                        if !newValue {
+                            store.errorMessage = nil
+                        }
                     }
-                }
-            )) {
+                )
+            ) {
                 Button("Ок", role: .cancel) {}
             } message: {
                 Text(store.errorMessage ?? "")
@@ -130,7 +134,9 @@ struct ContentView: View {
     private var weekStrip: some View {
         VStack(spacing: 10) {
             HStack {
-                Button { moveWeek(by: -1) } label: {
+                Button {
+                    moveWeek(by: -1)
+                } label: {
                     Image(systemName: "chevron.left")
                         .fontWeight(.semibold)
                         .contentShape(Rectangle())
@@ -143,7 +149,9 @@ struct ContentView: View {
 
                 Spacer()
 
-                Button { moveWeek(by: 1) } label: {
+                Button {
+                    moveWeek(by: 1)
+                } label: {
                     Image(systemName: "chevron.right")
                         .fontWeight(.semibold)
                         .contentShape(Rectangle())
@@ -204,11 +212,13 @@ struct ContentView: View {
     }
 
     private func moveWeek(by direction: Int) {
-        guard let d = calendar.date(
-            byAdding: .weekOfYear,
-            value: direction,
-            to: selectedDate
-        ) else { return }
+        guard
+            let d = calendar.date(
+                byAdding: .weekOfYear,
+                value: direction,
+                to: selectedDate
+            )
+        else { return }
         withAnimation(.snappy(duration: 0.25)) {
             selectedDate = d
         }
@@ -265,13 +275,22 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 Text(entry.timeString)
-                    .font(.system(.subheadline, design: .rounded, weight: .semibold))
+                    .font(
+                        .system(
+                            .subheadline,
+                            design: .rounded,
+                            weight: .semibold
+                        )
+                    )
                 Spacer()
                 Text(entry.classType.rawValue)
                     .font(.caption)
                     .padding(.horizontal, 9)
                     .padding(.vertical, 4)
-                    .background(classTypeColor(for: entry.classType).opacity(0.2), in: Capsule())
+                    .background(
+                        classTypeColor(for: entry.classType).opacity(0.2),
+                        in: Capsule()
+                    )
             }
 
             Text(entry.subject)
@@ -284,9 +303,13 @@ struct ContentView: View {
             }
 
             HStack(spacing: 10) {
-                Label(entry.isRemote ? "Дистанционно" : (entry.room ?? "Дистанционно"), systemImage: entry.isRemote ? "video" : "building.2")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                Label(
+                    entry.isRemote
+                        ? "Дистанционно" : (entry.room ?? "Дистанционно"),
+                    systemImage: entry.isRemote ? "video" : "building.2"
+                )
+                .font(.footnote)
+                .foregroundStyle(.secondary)
 
                 Spacer()
 
@@ -301,7 +324,10 @@ struct ContentView: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(
+            .thinMaterial,
+            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+        )
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .strokeBorder(.white.opacity(0.2), lineWidth: 1)
@@ -316,7 +342,10 @@ struct ContentView: View {
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 24)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .background(
+                .ultraThinMaterial,
+                in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+            )
             .overlay(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .strokeBorder(.white.opacity(0.25), lineWidth: 1)
@@ -333,10 +362,12 @@ struct ContentView: View {
             Text("Нет расписания")
                 .font(.title3.weight(.semibold))
 
-            Text("Добавьте PDF-файл с расписанием, и приложение сразу покажет пары.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
+            Text(
+                "Добавьте PDF-файл с расписанием, и приложение сразу покажет пары."
+            )
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.center)
 
             Button {
                 isImporterPresented = true
@@ -348,7 +379,10 @@ struct ContentView: View {
         }
         .padding(22)
         .frame(maxWidth: .infinity)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(
+            .ultraThinMaterial,
+            in: RoundedRectangle(cornerRadius: 24, style: .continuous)
+        )
         .overlay(
             RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .strokeBorder(.white.opacity(0.25), lineWidth: 1)
@@ -371,7 +405,10 @@ struct ContentView: View {
             }
             .padding(.horizontal, 26)
             .padding(.vertical, 18)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .background(
+                .ultraThinMaterial,
+                in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+            )
             .overlay(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .strokeBorder(.white.opacity(0.25), lineWidth: 1)
@@ -420,7 +457,10 @@ private struct SettingsView: View {
                         onImportPDF()
                     }
                 } label: {
-                    Label(hasSchedule ? "Заменить PDF" : "Загрузить PDF", systemImage: "doc.viewfinder")
+                    Label(
+                        hasSchedule ? "Заменить PDF" : "Загрузить PDF",
+                        systemImage: "doc.viewfinder"
+                    )
                 }
                 .disabled(isImporting)
 
@@ -453,7 +493,10 @@ private struct SettingsView: View {
                 }
             }
         }
-        .alert("Удалить текущее расписание?", isPresented: $showDeleteConfirmation) {
+        .alert(
+            "Удалить текущее расписание?",
+            isPresented: $showDeleteConfirmation
+        ) {
             Button("Удалить", role: .destructive) {
                 onDeleteSchedule()
                 dismiss()
@@ -499,12 +542,12 @@ private enum DateTextFormatters {
     }()
 }
 
-private extension Subgroup {
-    static var pickerValues: [Subgroup] {
+extension Subgroup {
+    fileprivate static var pickerValues: [Subgroup] {
         [.all, .a, .b]
     }
 
-    var title: String {
+    fileprivate var title: String {
         switch self {
         case .all: return "Все"
         case .a: return "А"
@@ -513,12 +556,12 @@ private extension Subgroup {
     }
 }
 
-private extension Date {
-    var dayID: String {
+extension Date {
+    fileprivate var dayID: String {
         DateTextFormatters.dayID.string(from: self)
     }
 
-    var fullDayTitle: String {
+    fileprivate var fullDayTitle: String {
         DateTextFormatters.fullDay.string(from: self).capitalized
     }
 }

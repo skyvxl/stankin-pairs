@@ -10,15 +10,15 @@ import PDFKit
 
 // MARK: - 1. Модели данных ═══════════════════════════════════════
 
-private extension String {
-    var scheduleTrimmed: String {
+extension String {
+    fileprivate var scheduleTrimmed: String {
         components(separatedBy: .whitespacesAndNewlines)
             .filter { !$0.isEmpty }
             .joined(separator: " ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    var cleanedDateToken: String {
+    fileprivate var cleanedDateToken: String {
         replacingOccurrences(of: " ", with: "")
             .replacingOccurrences(of: "\n", with: "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -218,28 +218,38 @@ struct ScheduleEntry: Codable, Identifiable {
     private static func normalizeSubject(_ raw: String) -> String {
         var value = raw.scheduleTrimmed
         while value.hasPrefix(".") || value.hasPrefix(",") {
-            value = String(value.dropFirst()).trimmingCharacters(in: .whitespaces)
+            value = String(value.dropFirst()).trimmingCharacters(
+                in: .whitespaces
+            )
         }
         while value.hasSuffix(".") || value.hasSuffix(",") {
-            value = String(value.dropLast()).trimmingCharacters(in: .whitespaces)
+            value = String(value.dropLast()).trimmingCharacters(
+                in: .whitespaces
+            )
         }
         return value.isEmpty ? "Без названия" : value
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        let id = try container.decodeIfPresent(String.self, forKey: .id)
+        let id =
+            try container.decodeIfPresent(String.self, forKey: .id)
             ?? UUID().uuidString
         let subject = try container.decode(String.self, forKey: .subject)
-        let teacher = try container.decodeIfPresent(String.self, forKey: .teacher)
+        let teacher = try container.decodeIfPresent(
+            String.self,
+            forKey: .teacher
+        )
         let classType = try container.decode(ClassType.self, forKey: .classType)
-        let subgroup = try container.decodeIfPresent(Subgroup.self, forKey: .subgroup)
+        let subgroup =
+            try container.decodeIfPresent(Subgroup.self, forKey: .subgroup)
             ?? .all
         let room = try container.decodeIfPresent(String.self, forKey: .room)
         let weekday = try container.decode(Weekday.self, forKey: .weekday)
         let slotStart = try container.decode(Int.self, forKey: .slotStart)
         let slotEnd =
-            try container.decodeIfPresent(Int.self, forKey: .slotEnd) ?? slotStart
+            try container.decodeIfPresent(Int.self, forKey: .slotEnd)
+            ?? slotStart
         let dates = try container.decode([DateRange].self, forKey: .dates)
 
         self.init(
@@ -303,7 +313,7 @@ struct GroupSchedule: Codable {
                         forceBiweekly: forceBiweekly
                     )
                 }
-                    .contains { cal.startOfDay(for: $0) == target }
+                .contains { cal.startOfDay(for: $0) == target }
             }
             .sorted { $0.slotStart < $1.slotStart }
     }
@@ -344,9 +354,10 @@ struct GroupSchedule: Codable {
         _ lhs: ScheduleEntry,
         _ rhs: ScheduleEntry
     ) -> Bool {
-        for l in lhs.dates where l.end != nil && l.isEveryWeek && !l.isBiweekly {
-            for r in rhs.dates where r.end != nil && r.isEveryWeek && !r.isBiweekly
-            {
+        for l in lhs.dates where l.end != nil && l.isEveryWeek && !l.isBiweekly
+        {
+            for r in rhs.dates
+            where r.end != nil && r.isEveryWeek && !r.isBiweekly {
                 guard let delta = dayDelta(l.start, r.start) else { continue }
                 if abs(delta) == 7 { return true }
             }
@@ -371,7 +382,8 @@ struct GroupSchedule: Codable {
             return components.date
         }
 
-        guard let leftDate = makeDate(from: lhs), let rightDate = makeDate(from: rhs)
+        guard let leftDate = makeDate(from: lhs),
+            let rightDate = makeDate(from: rhs)
         else { return nil }
 
         return Calendar(identifier: .gregorian)
@@ -672,9 +684,11 @@ struct CellExtractor {
                             }
                         }
 
-                        let nextJoined = nextColLines
+                        let nextJoined =
+                            nextColLines
                             .joined(separator: "\n")
-                        let nextClean = nextJoined
+                        let nextClean =
+                            nextJoined
                             .trimmingCharacters(
                                 in: .whitespacesAndNewlines
                                     .union(.punctuationCharacters)
@@ -684,7 +698,8 @@ struct CellExtractor {
                             // col+1 имеет свой контент → overflow.
                             // Используем полный текст (не обрезанный)
                             // из line-split, а не из rawTexts.
-                            let colFullText = colLines
+                            let colFullText =
+                                colLines
                                 .joined(separator: "\n")
                             cells.append(
                                 TableCell(
@@ -704,9 +719,11 @@ struct CellExtractor {
 
                         // col+1 пуст → настоящий merge (лаба на 2 пары).
                         let mergedText = mergedSel.string ?? ""
-                        let mOpen = mergedText
+                        let mOpen =
+                            mergedText
                             .filter({ $0 == "[" }).count
-                        let mClose = mergedText
+                        let mClose =
+                            mergedText
                             .filter({ $0 == "]" }).count
                         let mBalanced =
                             mOpen == mClose && mOpen > 0
@@ -911,7 +928,8 @@ struct CellTextParser {
         }
 
         let roomRegex = try? NSRegularExpression(
-            pattern: #"(Фрезер\s*С\/З\s*\d+|\b\d{3,4}(?:\([а-яА-Яa-zA-Z]\))?\b)"#
+            pattern:
+                #"(Фрезер\s*С\/З\s*\d+|\b\d{3,4}(?:\([а-яА-Яa-zA-Z]\))?\b)"#
         )
 
         guard let roomRegex,
