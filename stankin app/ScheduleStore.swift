@@ -1,5 +1,5 @@
-import Foundation
 import Combine
+import Foundation
 
 @MainActor
 final class ScheduleStore: ObservableObject {
@@ -43,7 +43,8 @@ final class ScheduleStore: ObservableObject {
 
     func date(forOffset offset: Int, anchor: Date = Date()) -> Date {
         let center = calendar.startOfDay(for: anchor)
-        return calendar.date(byAdding: .day, value: offset, to: center) ?? center
+        return calendar.date(byAdding: .day, value: offset, to: center)
+            ?? center
     }
 
     func bootstrapTimeline(anchor: Date = Date()) {
@@ -126,11 +127,19 @@ final class ScheduleStore: ObservableObject {
     }
 
     private func cacheURL() -> URL? {
-        guard let folder = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+        guard
+            let folder = FileManager.default.urls(
+                for: .applicationSupportDirectory,
+                in: .userDomainMask
+            ).first
+        else {
             return nil
         }
         do {
-            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(
+                at: folder,
+                withIntermediateDirectories: true
+            )
         } catch {
             return nil
         }
@@ -143,13 +152,15 @@ final class ScheduleStore: ObservableObject {
         do {
             try data.write(to: url, options: .atomic)
         } catch {
-            errorMessage = "Не удалось сохранить кэш: \(error.localizedDescription)"
+            errorMessage =
+                "Не удалось сохранить кэш: \(error.localizedDescription)"
         }
     }
 
     private func loadCachedSchedule() {
         Task { @MainActor in
-            let result = await Task.detached(priority: .utility) { () -> Result<GroupSchedule?, Error> in
+            let result = await Task.detached(priority: .utility) {
+                () -> Result<GroupSchedule?, Error> in
                 guard
                     let url = Self.cachedScheduleURL(),
                     FileManager.default.fileExists(atPath: url.path)
@@ -171,7 +182,8 @@ final class ScheduleStore: ObservableObject {
                     schedule = decoded
                 }
             case .failure(let error):
-                errorMessage = "Не удалось загрузить кэш: \(error.localizedDescription)"
+                errorMessage =
+                    "Не удалось загрузить кэш: \(error.localizedDescription)"
             }
         }
     }
@@ -179,9 +191,18 @@ final class ScheduleStore: ObservableObject {
     private func extendTimeline(olderBy: Int, newerBy: Int) {
         guard olderBy > 0 || newerBy > 0 else { return }
 
-        let newLower = max(-maxTimelinePaddingDays, timelineRange.lowerBound - olderBy)
-        let newUpper = min(maxTimelinePaddingDays, timelineRange.upperBound + newerBy)
-        guard newLower != timelineRange.lowerBound || newUpper != timelineRange.upperBound else {
+        let newLower = max(
+            -maxTimelinePaddingDays,
+            timelineRange.lowerBound - olderBy
+        )
+        let newUpper = min(
+            maxTimelinePaddingDays,
+            timelineRange.upperBound + newerBy
+        )
+        guard
+            newLower != timelineRange.lowerBound
+                || newUpper != timelineRange.upperBound
+        else {
             return
         }
         timelineRange = newLower...newUpper
@@ -196,8 +217,11 @@ final class ScheduleStore: ObservableObject {
     }
 
     private nonisolated static func cachedScheduleURL() -> URL? {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
-            .first?
-            .appendingPathComponent("schedule_cache.json")
+        FileManager.default.urls(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask
+        )
+        .first?
+        .appendingPathComponent("schedule_cache.json")
     }
 }

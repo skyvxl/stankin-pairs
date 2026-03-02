@@ -187,11 +187,12 @@
 				};
 			};
 			buildConfigurationList = DEBBB1D12F547E3900DF65E7 /* Build configuration list for PBXProject "stankin app" */;
-			developmentRegion = en;
+			developmentRegion = ru;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
 				Base,
+				ru,
 			);
 			mainGroup = DEBBB1CD2F547E3900DF65E7;
 			minimizedProjectReferenceProxies = 1;
