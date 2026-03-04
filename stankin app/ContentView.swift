@@ -1,18 +1,38 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct ContentView: View {
     @StateObject private var store = ScheduleStore()
     @State private var selectedDate = Calendar(identifier: .gregorian)
         .startOfDay(for: Date())
-    @State private var isImporterPresented = false
+    @State private var isGroupPickerPresented = false
     @State private var isSettingsPresented = false
+    @State private var isDatePickerPresented = false
+    @State private var scrolledDateID: String?
 
     private static let russianCalendar: Calendar = {
         var cal = Calendar(identifier: .gregorian)
         cal.locale = Locale(identifier: "ru_RU")
         cal.firstWeekday = 2
         return cal
+    }()
+
+    /// ClosedRange для DatePicker и pager (±10 лет).
+    private static let pagerDateRange: ClosedRange<Date> = {
+        let cal = russianCalendar
+        let today = cal.startOfDay(for: Date())
+        let start = cal.date(byAdding: .year, value: -10, to: today)!
+        let end = cal.date(byAdding: .year, value: 10, to: today)!
+        return start...end
+    }()
+
+    /// Массив дат для pager.
+    private static let pagerDates: [Date] = {
+        let cal = russianCalendar
+        let today = cal.startOfDay(for: Date())
+        let totalDays = 365 * 10
+        return (-totalDays...totalDays).compactMap {
+            cal.date(byAdding: .day, value: $0, to: today)
+        }
     }()
 
     private let calendar = ContentView.russianCalendar
@@ -27,8 +47,8 @@ struct ContentView: View {
                 }
             }
             .overlay {
-                if store.isImporting {
-                    importingOverlay
+                if store.isLoading {
+                    loadingOverlay
                 }
             }
             .navigationTitle(store.navigationTitle)
@@ -38,7 +58,7 @@ struct ContentView: View {
                     ToolbarItem(placement: .topBarTrailing) {
                         HStack(spacing: 2) {
                             Button {
-                                goToToday()
+                                isDatePickerPresented = true
                             } label: {
                                 Image(systemName: "calendar")
                             }
@@ -47,20 +67,24 @@ struct ContentView: View {
                             } label: {
                                 Image(systemName: "gearshape")
                             }
-                            .disabled(store.isImporting)
                         }
                     }
                 }
+            }
+            .sheet(isPresented: $isDatePickerPresented) {
+                datePickerSheet
             }
             .sheet(isPresented: $isSettingsPresented) {
                 NavigationStack {
                     SettingsView(
                         groupName: store.schedule?.groupName,
                         hasSchedule: store.hasSchedule,
-                        isImporting: store.isImporting,
                         selectedSubgroup: $store.selectedSubgroup,
-                        onImportPDF: {
-                            isImporterPresented = true
+                        onChangeGroup: {
+                            isGroupPickerPresented = true
+                        },
+                        onRefresh: {
+                            store.refreshSchedule()
                         },
                         onDeleteSchedule: {
                             store.removeSchedule()
@@ -70,28 +94,15 @@ struct ContentView: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
             }
-            .fileImporter(
-                isPresented: $isImporterPresented,
-                allowedContentTypes: [.pdf],
-                allowsMultipleSelection: false
-            ) { result in
-                switch result {
-                case .success(let files):
-                    guard let first = files.first else { return }
-                    store.importSchedule(from: first)
-                case .failure(let error):
-                    store.errorMessage =
-                        "Не удалось открыть файл: \(error.localizedDescription)"
-                }
+            .sheet(isPresented: $isGroupPickerPresented) {
+                GroupPickerView(store: store)
             }
             .alert(
                 "Ошибка",
                 isPresented: Binding(
                     get: { store.errorMessage != nil },
                     set: { newValue in
-                        if !newValue {
-                            store.errorMessage = nil
-                        }
+                        if !newValue { store.errorMessage = nil }
                     }
                 )
             ) {
@@ -102,13 +113,48 @@ struct ContentView: View {
         }
     }
 
+    // MARK: - Date Picker Sheet
+
+    private var datePickerSheet: some View {
+        NavigationStack {
+            DatePicker(
+                "Выберите дату",
+                selection: Binding(
+                    get: { selectedDate },
+                    set: { newDate in
+                        withAnimation(.snappy(duration: 0.25)) {
+                            selectedDate = calendar.startOfDay(for: newDate)
+                        }
+                        isDatePickerPresented = false
+                    }
+                ),
+                in: Self.pagerDateRange,
+                displayedComponents: [.date]
+            )
+            .datePickerStyle(.graphical)
+            .environment(\.locale, Locale(identifier: "ru_RU"))
+            .padding(.horizontal)
+            .navigationTitle("Выберите дату")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Готово") {
+                        isDatePickerPresented = false
+                    }
+                }
+            }
+        }
+        .presentationDetents([.height(480)])
+        .presentationDragIndicator(.visible)
+    }
+
     // MARK: - Schedule View
 
     private var scheduleView: some View {
         VStack(spacing: 0) {
             weekStrip
             Divider()
-            daySchedule
+            dayPager
         }
     }
 
@@ -131,31 +177,65 @@ struct ContentView: View {
             .capitalized
     }
 
+    private var isOnToday: Bool {
+        calendar.isDateInToday(selectedDate)
+    }
+
+    /// true — сегодня раньше (левее) выбранной даты → кнопка слева.
+    private var isTodayBefore: Bool {
+        calendar.startOfDay(for: Date()) < selectedDate
+    }
+
+    private var todayChip: some View {
+        Button {
+            goToToday()
+        } label: {
+            Text("Сегодня")
+                .font(.caption.weight(.semibold))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    Color.accentColor.opacity(0.15),
+                    in: Capsule()
+                )
+        }
+    }
+
     private var weekStrip: some View {
         VStack(spacing: 10) {
-            HStack {
-                Button {
-                    moveWeek(by: -1)
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .fontWeight(.semibold)
-                        .contentShape(Rectangle())
-                }
-
-                Spacer()
-
+            ZStack {
                 Text(monthYearTitle)
                     .font(.subheadline.weight(.semibold))
 
-                Spacer()
+                HStack {
+                    Button {
+                        moveWeek(by: -1)
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .fontWeight(.semibold)
+                            .contentShape(Rectangle())
+                    }
 
-                Button {
-                    moveWeek(by: 1)
-                } label: {
-                    Image(systemName: "chevron.right")
-                        .fontWeight(.semibold)
-                        .contentShape(Rectangle())
+                    todayChip
+                        .opacity(!isOnToday && isTodayBefore ? 1 : 0)
+                        .allowsHitTesting(!isOnToday && isTodayBefore)
+
+                    Spacer()
+
+                    todayChip
+                        .opacity(!isOnToday && !isTodayBefore ? 1 : 0)
+                        .allowsHitTesting(!isOnToday && !isTodayBefore)
+
+                    Button {
+                        moveWeek(by: 1)
+                    } label: {
+                        Image(systemName: "chevron.right")
+                            .fontWeight(.semibold)
+                            .contentShape(Rectangle())
+                    }
                 }
+                .animation(.easeInOut(duration: 0.2), value: isOnToday)
+                .animation(.easeInOut(duration: 0.2), value: isTodayBefore)
             }
             .padding(.horizontal, 20)
 
@@ -219,8 +299,11 @@ struct ContentView: View {
                 to: selectedDate
             )
         else { return }
+        let clamped = max(
+            Self.pagerDateRange.lowerBound,
+            min(d, Self.pagerDateRange.upperBound))
         withAnimation(.snappy(duration: 0.25)) {
-            selectedDate = d
+            selectedDate = clamped
         }
     }
 
@@ -230,31 +313,49 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Day Schedule
+    // MARK: - Day Pager
 
-    private var dayTitle: String {
-        if calendar.isDateInToday(selectedDate) {
-            return "Сегодня"
+    private var dateRange: [Date] { Self.pagerDates }
+
+    private var dayPager: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            LazyHStack(spacing: 0) {
+                ForEach(dateRange, id: \.dayID) { date in
+                    dayPage(for: date)
+                        .containerRelativeFrame(.horizontal)
+                }
+            }
+            .scrollTargetLayout()
         }
-        if calendar.isDateInTomorrow(selectedDate) {
-            return "Завтра"
+        .scrollTargetBehavior(.paging)
+        .scrollPosition(id: $scrolledDateID)
+        .onChange(of: scrolledDateID) { _, newID in
+            guard let newID else { return }
+            if let date = DateTextFormatters.dayID.date(from: newID) {
+                let normalized = calendar.startOfDay(for: date)
+                if !calendar.isDate(normalized, inSameDayAs: selectedDate) {
+                    selectedDate = normalized
+                }
+            }
         }
-        if calendar.isDateInYesterday(selectedDate) {
-            return "Вчера"
+        .onChange(of: selectedDate) { _, newDate in
+            let id = newDate.dayID
+            if scrolledDateID != id {
+                withAnimation {
+                    scrolledDateID = id
+                }
+            }
         }
-        return selectedDate.fullDayTitle
+        .onAppear {
+            scrolledDateID = selectedDate.dayID
+        }
     }
 
-    private var daySchedule: some View {
-        let entries = store.entries(for: selectedDate)
+    private func dayPage(for date: Date) -> some View {
+        let entries = store.entries(for: date)
 
         return ScrollView {
             LazyVStack(spacing: 10) {
-                Text(dayTitle)
-                    .font(.title3.weight(.semibold))
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.top, 12)
-
                 if entries.isEmpty {
                     noLessonsCard
                 } else {
@@ -264,9 +365,9 @@ struct ContentView: View {
                 }
             }
             .padding(.horizontal, 16)
+            .padding(.top, 12)
             .padding(.bottom, 40)
         }
-        .id(selectedDate.dayID)
     }
 
     // MARK: - Lesson Card (kept intact)
@@ -356,23 +457,21 @@ struct ContentView: View {
 
     private var onboardingState: some View {
         VStack(spacing: 14) {
-            Image(systemName: "doc.viewfinder")
+            Image(systemName: "person.2.circle")
                 .font(.system(size: 34, weight: .medium))
 
             Text("Нет расписания")
                 .font(.title3.weight(.semibold))
 
-            Text(
-                "Добавьте PDF-файл с расписанием, и приложение сразу покажет пары."
-            )
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
-            .multilineTextAlignment(.center)
+            Text("Выберите вашу группу, и приложение загрузит расписание.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
 
             Button {
-                isImporterPresented = true
+                isGroupPickerPresented = true
             } label: {
-                Text("Добавить расписание")
+                Text("Выбрать группу")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
@@ -390,9 +489,9 @@ struct ContentView: View {
         .padding(.horizontal, 16)
     }
 
-    // MARK: - Importing Overlay
+    // MARK: - Loading Overlay
 
-    private var importingOverlay: some View {
+    private var loadingOverlay: some View {
         ZStack {
             Color.black.opacity(0.12)
                 .ignoresSafeArea()
@@ -400,7 +499,7 @@ struct ContentView: View {
             VStack(spacing: 10) {
                 ProgressView()
                     .progressViewStyle(.circular)
-                Text("Распознаю PDF…")
+                Text("Загружаю расписание…")
                     .font(.subheadline)
             }
             .padding(.horizontal, 26)
@@ -428,14 +527,72 @@ struct ContentView: View {
     }
 }
 
+// MARK: - Group Picker View
+
+private struct GroupPickerView: View {
+    @ObservedObject var store: ScheduleStore
+    @Environment(\.dismiss) private var dismiss
+    @State private var searchText = ""
+
+    private var filteredGroups: [String] {
+        if searchText.isEmpty { return store.availableGroups }
+        return store.availableGroups.filter {
+            $0.localizedCaseInsensitiveContains(searchText)
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if store.availableGroups.isEmpty && store.isLoadingGroups {
+                    ProgressView("Загрузка групп…")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if store.availableGroups.isEmpty {
+                    ContentUnavailableView(
+                        "Нет данных",
+                        systemImage: "wifi.slash",
+                        description: Text(
+                            "Не удалось загрузить список групп.\nПроверьте подключение к интернету."
+                        )
+                    )
+                } else {
+                    List(filteredGroups, id: \.self) { group in
+                        Button {
+                            store.loadSchedule(group: group)
+                            dismiss()
+                        } label: {
+                            Text(group)
+                                .foregroundStyle(.primary)
+                        }
+                    }
+                    .searchable(
+                        text: $searchText,
+                        prompt: "Поиск группы"
+                    )
+                }
+            }
+            .navigationTitle("Выберите группу")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Закрыть") { dismiss() }
+                }
+            }
+        }
+        .onAppear {
+            store.fetchGroups()
+        }
+    }
+}
+
 // MARK: - Settings View
 
 private struct SettingsView: View {
     let groupName: String?
     let hasSchedule: Bool
-    let isImporting: Bool
     @Binding var selectedSubgroup: Subgroup
-    let onImportPDF: () -> Void
+    let onChangeGroup: () -> Void
+    let onRefresh: () -> Void
     let onDeleteSchedule: () -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -444,34 +601,59 @@ private struct SettingsView: View {
     var body: some View {
         Form {
             Section("Расписание") {
-                HStack {
+                HStack(spacing: 12) {
+                    Image(systemName: "person.2")
+                        .foregroundStyle(.blue)
+                        .frame(width: 24)
                     Text("Группа")
                     Spacer()
-                    Text(groupName ?? "Не загружено")
+                    Text(groupName ?? "Не выбрана")
                         .foregroundStyle(.secondary)
                 }
 
                 Button {
                     dismiss()
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                        onImportPDF()
+                        onChangeGroup()
                     }
                 } label: {
-                    Label(
-                        hasSchedule ? "Заменить PDF" : "Загрузить PDF",
-                        systemImage: "doc.viewfinder"
-                    )
+                    HStack(spacing: 12) {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .foregroundStyle(.orange)
+                            .frame(width: 24)
+                        Text("Сменить группу")
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.tertiary)
+                    }
                 }
-                .disabled(isImporting)
+                .tint(.primary)
+
+                Button {
+                    onRefresh()
+                    dismiss()
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "arrow.clockwise")
+                            .foregroundStyle(.green)
+                            .frame(width: 24)
+                        Text("Обновить расписание")
+                    }
+                }
+                .tint(.primary)
 
                 if hasSchedule {
                     Button(role: .destructive) {
                         showDeleteConfirmation = true
                     } label: {
-                        Label("Удалить расписание", systemImage: "trash")
-                            .foregroundStyle(.red)
+                        HStack(spacing: 12) {
+                            Image(systemName: "trash")
+                                .foregroundStyle(.red)
+                                .frame(width: 24)
+                            Text("Удалить расписание")
+                        }
                     }
-                    .disabled(isImporting)
                 }
             }
 
@@ -488,9 +670,7 @@ private struct SettingsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button("Готово") {
-                    dismiss()
-                }
+                Button("Готово") { dismiss() }
             }
         }
         .alert(
@@ -503,9 +683,10 @@ private struct SettingsView: View {
             }
             Button("Отмена", role: .cancel) {}
         } message: {
-            Text("Вы сможете загрузить новое PDF в любой момент.")
+            Text("Вы сможете выбрать новую группу в любой момент.")
         }
     }
+
 }
 
 // MARK: - Formatters
@@ -533,13 +714,6 @@ private enum DateTextFormatters {
         formatter.dateFormat = "yyyy-MM-dd"
         return formatter
     }()
-
-    static let fullDay: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ru_RU")
-        formatter.dateFormat = "EEEE, d MMMM"
-        return formatter
-    }()
 }
 
 extension Subgroup {
@@ -559,9 +733,5 @@ extension Subgroup {
 extension Date {
     fileprivate var dayID: String {
         DateTextFormatters.dayID.string(from: self)
-    }
-
-    fileprivate var fullDayTitle: String {
-        DateTextFormatters.fullDay.string(from: self).capitalized
     }
 }
