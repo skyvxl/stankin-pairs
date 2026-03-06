@@ -153,35 +153,39 @@ private struct APIEntry: Codable {
 
 // MARK: - 3. Schedule API Client ══════════════════════════════════
 
+private struct APIGroup: Codable {
+    let group_name: String
+    let group_link: String
+}
+
 enum ScheduleAPI {
-    private static let baseURL = "http://31.128.40.124:8000"
+    private static let baseURL =
+        "https://raw.githubusercontent.com/skyvxl/schedule-parser/refs/heads/schedules"
 
     /// Список всех доступных групп.
     static func fetchGroups() async throws -> [String] {
-        let url = URL(string: "\(baseURL)/schedule")!
-        var request = URLRequest(url: url)
-        request.setValue("android", forHTTPHeaderField: "device")
-        request.timeoutInterval = 15
-
-        let (data, _) = try await URLSession.shared.data(for: request)
-        return try JSONDecoder().decode([String].self, from: data)
+        let url = URL(string: "\(baseURL)/groups.json")!
+        let (data, _) = try await URLSession.shared.data(
+            for: URLRequest(url: url, timeoutInterval: 15)
+        )
+        let groups = try JSONDecoder().decode([APIGroup].self, from: data)
+        return groups.map(\.group_name)
     }
 
     /// Расписание для конкретной группы.
     static func fetchSchedule(group: String) async throws -> GroupSchedule {
-        guard let encoded = group.addingPercentEncoding(
+        let fileName = "\(group).json"
+        guard let encoded = fileName.addingPercentEncoding(
             withAllowedCharacters: .urlPathAllowed
         ),
-            let url = URL(string: "\(baseURL)/schedule/\(encoded)")
+            let url = URL(string: "\(baseURL)/\(encoded)")
         else {
             throw URLError(.badURL)
         }
 
-        var request = URLRequest(url: url)
-        request.setValue("android", forHTTPHeaderField: "device")
-        request.timeoutInterval = 15
-
-        let (data, _) = try await URLSession.shared.data(for: request)
+        let (data, _) = try await URLSession.shared.data(
+            for: URLRequest(url: url, timeoutInterval: 15)
+        )
         let apiEntries = try JSONDecoder().decode([APIEntry].self, from: data)
         return convert(apiEntries, groupName: group)
     }
