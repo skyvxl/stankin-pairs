@@ -755,7 +755,7 @@ private struct SettingsView: View {
                     }
                 }
 
-                Section {
+                Section("О приложении") {
                     HStack(spacing: 12) {
                         Image(systemName: "info.circle")
                             .foregroundStyle(.secondary)
