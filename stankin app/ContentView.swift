@@ -8,6 +8,8 @@ struct ContentView: View {
     @State private var isSettingsPresented = false
     @State private var isDatePickerPresented = false
     @State private var scrolledDateID: String?
+    @State private var settingsDetent: PresentationDetent = .medium
+    @AppStorage("appTheme") private var appTheme: AppTheme = .system
 
     private static let russianCalendar: Calendar = {
         var cal = Calendar(identifier: .gregorian)
@@ -74,12 +76,16 @@ struct ContentView: View {
             .sheet(isPresented: $isDatePickerPresented) {
                 datePickerSheet
             }
-            .sheet(isPresented: $isSettingsPresented) {
+            .sheet(isPresented: $isSettingsPresented, onDismiss: {
+                settingsDetent = .medium
+            }) {
                 NavigationStack {
                     SettingsView(
                         groupName: store.schedule?.groupName,
                         hasSchedule: store.hasSchedule,
                         selectedSubgroup: $store.selectedSubgroup,
+                        isExpanded: settingsDetent == .large,
+                        appTheme: $appTheme,
                         onChangeGroup: {
                             isGroupPickerPresented = true
                         },
@@ -91,7 +97,7 @@ struct ContentView: View {
                         }
                     )
                 }
-                .presentationDetents([.medium, .large])
+                .presentationDetents([.medium, .large], selection: $settingsDetent)
                 .presentationDragIndicator(.visible)
             }
             .sheet(isPresented: $isGroupPickerPresented) {
@@ -110,6 +116,16 @@ struct ContentView: View {
             } message: {
                 Text(store.errorMessage ?? "")
             }
+        }
+        .onAppear { applyTheme(appTheme) }
+        .onChange(of: appTheme) { _, newTheme in applyTheme(newTheme) }
+    }
+
+    private func applyTheme(_ theme: AppTheme) {
+        guard let scene = UIApplication.shared.connectedScenes.first
+                as? UIWindowScene else { return }
+        for window in scene.windows {
+            window.overrideUserInterfaceStyle = theme.userInterfaceStyle
         }
     }
 
@@ -585,18 +601,48 @@ private struct GroupPickerView: View {
     }
 }
 
+// MARK: - App Theme
+
+private enum AppTheme: String, CaseIterable {
+    case system, light, dark
+
+    var title: String {
+        switch self {
+        case .system: return "Системная"
+        case .light:  return "Светлая"
+        case .dark:   return "Тёмная"
+        }
+    }
+
+    var userInterfaceStyle: UIUserInterfaceStyle {
+        switch self {
+        case .system: return .unspecified
+        case .light:  return .light
+        case .dark:   return .dark
+        }
+    }
+}
+
 // MARK: - Settings View
 
 private struct SettingsView: View {
     let groupName: String?
     let hasSchedule: Bool
     @Binding var selectedSubgroup: Subgroup
+    let isExpanded: Bool
+    @Binding var appTheme: AppTheme
     let onChangeGroup: () -> Void
     let onRefresh: () -> Void
     let onDeleteSchedule: () -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var showDeleteConfirmation = false
+
+    private var appVersion: String {
+        let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+        let b = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+        return "\(v) (\(b))"
+    }
 
     var body: some View {
         Form {
@@ -665,7 +711,79 @@ private struct SettingsView: View {
                 }
                 .pickerStyle(.segmented)
             }
+
+            if isExpanded {
+                Section("Оформление") {
+                    Picker("Тема", selection: $appTheme) {
+                        ForEach(AppTheme.allCases, id: \.self) { theme in
+                            Text(theme.title).tag(theme)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+
+                Section("Правила пользования") {
+                    Link(destination: URL(
+                        string: "https://github.com/skyvxl/schedule-parser/blob/main/PRIVACY.md"
+                    )!) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "hand.raised")
+                                .foregroundStyle(.blue)
+                                .frame(width: 24)
+                            Text("Политика конфиденциальности")
+                                .foregroundStyle(.primary)
+                            Spacer()
+                            Image(systemName: "arrow.up.right")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    Link(destination: URL(
+                        string: "https://github.com/skyvxl/schedule-parser/blob/main/TERMS.md"
+                    )!) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "doc.text")
+                                .foregroundStyle(.blue)
+                                .frame(width: 24)
+                            Text("Условия использования")
+                                .foregroundStyle(.primary)
+                            Spacer()
+                            Image(systemName: "arrow.up.right")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                }
+
+                Section {
+                    HStack(spacing: 12) {
+                        Image(systemName: "info.circle")
+                            .foregroundStyle(.secondary)
+                            .frame(width: 24)
+                        Text("Версия")
+                        Spacer()
+                        Text(appVersion)
+                            .foregroundStyle(.secondary)
+                    }
+                    Link(destination: URL(
+                        string: "mailto:skyvxl@icloud.com"
+                    )!) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "envelope")
+                                .foregroundStyle(.blue)
+                                .frame(width: 24)
+                            Text("Обратная связь")
+                                .foregroundStyle(.primary)
+                            Spacer()
+                            Image(systemName: "arrow.up.right")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                }
+            }
         }
+        .animation(.default, value: isExpanded)
         .navigationTitle("Настройки")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
