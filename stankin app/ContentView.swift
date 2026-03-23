@@ -207,30 +207,55 @@ struct ContentView: View {
             goToToday()
         } label: {
             Text("Сегодня")
-                .font(.caption.weight(.semibold))
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
+                .font(.caption.weight(.bold))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
                 .background(
-                    Color.accentColor.opacity(0.15),
+                    ZStack {
+                        Color.accentColor.opacity(0.2)
+                        Color.accentColor.opacity(0.1)
+                            .blur(radius: 4)
+                    },
                     in: Capsule()
                 )
+                .overlay(
+                    Capsule()
+                        .strokeBorder(
+                            Color.accentColor.opacity(0.4),
+                            lineWidth: 0.5
+                        )
+                )
+                .shadow(color: Color.accentColor.opacity(0.15), radius: 4, x: 0, y: 2)
         }
+        .buttonStyle(.plain)
     }
 
     private var weekStrip: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 12) {
             ZStack {
                 Text(monthYearTitle)
-                    .font(.subheadline.weight(.semibold))
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(.primary)
 
                 HStack {
                     Button {
                         moveWeek(by: -1)
                     } label: {
                         Image(systemName: "chevron.left")
-                            .fontWeight(.semibold)
-                            .contentShape(Rectangle())
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(.primary)
+                            .frame(width: 32, height: 32)
+                            .background(
+                                Circle()
+                                    .fill(.ultraThinMaterial)
+                                    .shadow(color: .black.opacity(0.06), radius: 4, x: 0, y: 2)
+                            )
+                            .overlay(
+                                Circle()
+                                    .strokeBorder(.white.opacity(0.3), lineWidth: 0.5)
+                            )
                     }
+                    .buttonStyle(.plain)
 
                     todayChip
                         .opacity(!isOnToday && isTodayBefore ? 1 : 0)
@@ -246,9 +271,20 @@ struct ContentView: View {
                         moveWeek(by: 1)
                     } label: {
                         Image(systemName: "chevron.right")
-                            .fontWeight(.semibold)
-                            .contentShape(Rectangle())
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(.primary)
+                            .frame(width: 32, height: 32)
+                            .background(
+                                Circle()
+                                    .fill(.ultraThinMaterial)
+                                    .shadow(color: .black.opacity(0.06), radius: 4, x: 0, y: 2)
+                            )
+                            .overlay(
+                                Circle()
+                                    .strokeBorder(.white.opacity(0.3), lineWidth: 0.5)
+                            )
                     }
+                    .buttonStyle(.plain)
                 }
                 .animation(.easeInOut(duration: 0.2), value: isOnToday)
                 .animation(.easeInOut(duration: 0.2), value: isTodayBefore)
@@ -262,7 +298,7 @@ struct ContentView: View {
             }
             .padding(.horizontal, 8)
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, 10)
     }
 
     @ViewBuilder
@@ -280,7 +316,7 @@ struct ContentView: View {
         } label: {
             VStack(spacing: 4) {
                 Text(weekdayName)
-                    .font(.caption2.weight(.medium))
+                    .font(.caption2.weight(.semibold))
                     .foregroundStyle(isSelected ? .white : .secondary)
 
                 Text("\(dayNum)")
@@ -296,11 +332,27 @@ struct ContentView: View {
                     )
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
+            .padding(.vertical, 10)
             .background {
                 if isSelected {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color.accentColor)
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color.accentColor,
+                                        Color.accentColor.opacity(0.85)
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(Color.white.opacity(0.15))
+                            .blur(radius: 2)
+                    }
+                    .shadow(color: Color.accentColor.opacity(0.4), radius: 8, x: 0, y: 4)
+                    .shadow(color: Color.accentColor.opacity(0.2), radius: 2, x: 0, y: 1)
                 }
             }
         }
@@ -389,33 +441,46 @@ struct ContentView: View {
     // MARK: - Lesson Card (kept intact)
 
     private func lessonCard(_ entry: ScheduleEntry) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
                 Text(entry.timeString)
                     .font(
                         .system(
                             .subheadline,
                             design: .rounded,
-                            weight: .semibold
+                            weight: .bold
                         )
                     )
+                    .foregroundStyle(.primary)
                 Spacer()
                 Text(entry.classType.rawValue)
-                    .font(.caption)
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 4)
+                    .font(.caption.weight(.semibold))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
                     .background(
-                        classTypeColor(for: entry.classType).opacity(0.2),
+                        ZStack {
+                            classTypeColor(for: entry.classType).opacity(0.15)
+                            classTypeColor(for: entry.classType).opacity(0.08)
+                                .blur(radius: 4)
+                        },
                         in: Capsule()
+                    )
+                    .overlay(
+                        Capsule()
+                            .strokeBorder(
+                                classTypeColor(for: entry.classType).opacity(0.3),
+                                lineWidth: 0.5
+                            )
                     )
             }
 
             Text(entry.subject)
-                .font(.headline)
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(.primary)
 
             if let teacher = entry.teacher, !teacher.isEmpty {
                 Text(teacher)
-                    .font(.subheadline)
+                    .font(.subheadline.weight(.medium))
                     .foregroundStyle(.secondary)
             }
 
@@ -423,113 +488,237 @@ struct ContentView: View {
                 Label(
                     entry.isRemote
                         ? "Дистанционно" : (entry.room ?? "Дистанционно"),
-                    systemImage: entry.isRemote ? "video" : "building.2"
+                    systemImage: entry.isRemote ? "video.fill" : "building.2.fill"
                 )
-                .font(.footnote)
+                .font(.footnote.weight(.medium))
                 .foregroundStyle(.secondary)
 
                 Spacer()
 
                 if entry.subgroup != .all {
                     Text("Подгруппа \(entry.subgroup.rawValue)")
-                        .font(.footnote)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(.white.opacity(0.14), in: Capsule())
+                        .font(.footnote.weight(.semibold))
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 4)
+                        .background(
+                            ZStack {
+                                Color.white.opacity(0.18)
+                                Color.white.opacity(0.08)
+                                    .blur(radius: 3)
+                            },
+                            in: Capsule()
+                        )
+                        .overlay(
+                            Capsule()
+                                .strokeBorder(.white.opacity(0.3), lineWidth: 0.5)
+                        )
                 }
             }
         }
-        .padding(14)
+        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            .thinMaterial,
-            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+            ZStack {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.05),
+                                Color.white.opacity(0.0)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(.white.opacity(0.2), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.4),
+                            Color.white.opacity(0.1)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
         )
+        .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
+        .shadow(color: Color.black.opacity(0.03), radius: 2, x: 0, y: 1)
     }
 
     // MARK: - No Lessons Card
 
     private var noLessonsCard: some View {
         Text("Пар нет")
-            .font(.headline)
+            .font(.headline.weight(.semibold))
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 24)
+            .padding(.vertical, 32)
             .background(
-                .ultraThinMaterial,
-                in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+                ZStack {
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .fill(.ultraThinMaterial)
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.03),
+                                    Color.white.opacity(0.0)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                }
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .strokeBorder(.white.opacity(0.25), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.35),
+                                Color.white.opacity(0.15)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
             )
+            .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 3)
     }
 
     // MARK: - Onboarding
 
     private var onboardingState: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "person.2.circle")
-                .font(.system(size: 34, weight: .medium))
+        VStack(spacing: 16) {
+            Image(systemName: "person.2.circle.fill")
+                .font(.system(size: 48, weight: .medium))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.blue, .blue.opacity(0.7)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .shadow(color: .blue.opacity(0.3), radius: 8, x: 0, y: 4)
 
             Text("Нет расписания")
-                .font(.title3.weight(.semibold))
+                .font(.title3.weight(.bold))
 
             Text("Выберите вашу группу, и приложение загрузит расписание.")
-                .font(.subheadline)
+                .font(.subheadline.weight(.medium))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
 
             Button {
                 isGroupPickerPresented = true
             } label: {
                 Text("Выбрать группу")
+                    .font(.body.weight(.semibold))
                     .frame(maxWidth: .infinity)
+                    .padding(.vertical, 2)
             }
             .buttonStyle(.borderedProminent)
+            .shadow(color: Color.accentColor.opacity(0.25), radius: 8, x: 0, y: 4)
         }
-        .padding(22)
+        .padding(28)
         .frame(maxWidth: .infinity)
         .background(
-            .ultraThinMaterial,
-            in: RoundedRectangle(cornerRadius: 24, style: .continuous)
+            ZStack {
+                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.05),
+                                Color.white.opacity(0.0)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(.white.opacity(0.25), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.4),
+                            Color.white.opacity(0.15)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1.5
+                )
         )
-        .padding(.horizontal, 16)
+        .shadow(color: Color.black.opacity(0.06), radius: 12, x: 0, y: 6)
+        .shadow(color: Color.black.opacity(0.03), radius: 4, x: 0, y: 2)
+        .padding(.horizontal, 20)
     }
 
     // MARK: - Loading Overlay
 
     private var loadingOverlay: some View {
         ZStack {
-            Color.black.opacity(0.12)
+            Color.black.opacity(0.2)
                 .ignoresSafeArea()
+                .background(.ultraThinMaterial)
 
-            VStack(spacing: 10) {
+            VStack(spacing: 12) {
                 ProgressView()
                     .progressViewStyle(.circular)
+                    .scaleEffect(1.1)
                 Text("Загружаю расписание…")
-                    .font(.subheadline)
+                    .font(.subheadline.weight(.semibold))
             }
-            .padding(.horizontal, 26)
-            .padding(.vertical, 18)
+            .padding(.horizontal, 32)
+            .padding(.vertical, 24)
             .background(
-                .ultraThinMaterial,
-                in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+                ZStack {
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .fill(.regularMaterial)
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.08),
+                                    Color.white.opacity(0.0)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .strokeBorder(.white.opacity(0.25), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.5),
+                                Color.white.opacity(0.2)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1.5
+                    )
             )
+            .shadow(color: Color.black.opacity(0.15), radius: 20, x: 0, y: 10)
+            .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 3)
         }
-        .transition(.opacity)
+        .transition(.opacity.combined(with: .scale(scale: 0.95)))
     }
 
     // MARK: - Helpers
