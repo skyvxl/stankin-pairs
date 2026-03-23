@@ -41,11 +41,24 @@ struct ContentView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if store.hasSchedule {
-                    scheduleView
-                } else {
-                    onboardingState
+            ZStack {
+                // Subtle background gradient
+                LinearGradient(
+                    colors: [
+                        Color.primary.opacity(0.02),
+                        Color.primary.opacity(0.0)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+
+                Group {
+                    if store.hasSchedule {
+                        scheduleView
+                    } else {
+                        onboardingState
+                    }
                 }
             }
             .overlay {
@@ -58,17 +71,44 @@ struct ContentView: View {
             .toolbar {
                 if store.hasSchedule {
                     ToolbarItem(placement: .topBarTrailing) {
-                        HStack(spacing: 2) {
+                        HStack(spacing: 8) {
                             Button {
                                 isDatePickerPresented = true
                             } label: {
                                 Image(systemName: "calendar")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundStyle(.primary)
+                                    .frame(width: 36, height: 36)
+                                    .background(
+                                        Circle()
+                                            .fill(.ultraThinMaterial)
+                                    )
+                                    .overlay(
+                                        Circle()
+                                            .strokeBorder(.white.opacity(0.25), lineWidth: 0.5)
+                                    )
+                                    .shadow(color: .black.opacity(0.04), radius: 3, x: 0, y: 1)
                             }
+                            .buttonStyle(.plain)
+
                             Button {
                                 isSettingsPresented = true
                             } label: {
-                                Image(systemName: "gearshape")
+                                Image(systemName: "gearshape.fill")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundStyle(.primary)
+                                    .frame(width: 36, height: 36)
+                                    .background(
+                                        Circle()
+                                            .fill(.ultraThinMaterial)
+                                    )
+                                    .overlay(
+                                        Circle()
+                                            .strokeBorder(.white.opacity(0.25), lineWidth: 0.5)
+                                    )
+                                    .shadow(color: .black.opacity(0.04), radius: 3, x: 0, y: 1)
                             }
+                            .buttonStyle(.plain)
                         }
                     }
                 }
@@ -99,6 +139,8 @@ struct ContentView: View {
                 }
                 .presentationDetents([.medium, .large], selection: $settingsDetent)
                 .presentationDragIndicator(.visible)
+                .presentationCornerRadius(28)
+                .presentationBackground(.regularMaterial)
             }
             .sheet(isPresented: $isGroupPickerPresented) {
                 GroupPickerView(store: store)
@@ -149,19 +191,25 @@ struct ContentView: View {
             )
             .datePickerStyle(.graphical)
             .environment(\.locale, Locale(identifier: "ru_RU"))
-            .padding(.horizontal)
+            .padding(.horizontal, 20)
+            .padding(.top, 8)
             .navigationTitle("Выберите дату")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Готово") {
+                    Button {
                         isDatePickerPresented = false
+                    } label: {
+                        Text("Готово")
+                            .font(.body.weight(.semibold))
                     }
                 }
             }
         }
         .presentationDetents([.height(480)])
         .presentationDragIndicator(.visible)
+        .presentationCornerRadius(28)
+        .presentationBackground(.regularMaterial)
     }
 
     // MARK: - Schedule View
@@ -751,6 +799,7 @@ private struct GroupPickerView: View {
             Group {
                 if store.availableGroups.isEmpty && store.isLoadingGroups {
                     ProgressView("Загрузка групп…")
+                        .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if store.availableGroups.isEmpty {
                     ContentUnavailableView(
@@ -767,6 +816,7 @@ private struct GroupPickerView: View {
                             dismiss()
                         } label: {
                             Text(group)
+                                .font(.body.weight(.medium))
                                 .foregroundStyle(.primary)
                         }
                     }
@@ -780,10 +830,17 @@ private struct GroupPickerView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Закрыть") { dismiss() }
+                    Button {
+                        dismiss()
+                    } label: {
+                        Text("Закрыть")
+                            .font(.body.weight(.semibold))
+                    }
                 }
             }
         }
+        .presentationCornerRadius(28)
+        .presentationBackground(.regularMaterial)
         .onAppear {
             store.fetchGroups()
         }
@@ -837,12 +894,15 @@ private struct SettingsView: View {
         Form {
             Section("Расписание") {
                 HStack(spacing: 12) {
-                    Image(systemName: "person.2")
+                    Image(systemName: "person.2.fill")
+                        .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(.blue)
-                        .frame(width: 24)
+                        .frame(width: 28)
                     Text("Группа")
+                        .font(.body.weight(.medium))
                     Spacer()
                     Text(groupName ?? "Не выбрана")
+                        .font(.body.weight(.medium))
                         .foregroundStyle(.secondary)
                 }
 
@@ -854,12 +914,14 @@ private struct SettingsView: View {
                 } label: {
                     HStack(spacing: 12) {
                         Image(systemName: "arrow.triangle.2.circlepath")
+                            .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle(.orange)
-                            .frame(width: 24)
+                            .frame(width: 28)
                         Text("Сменить группу")
+                            .font(.body.weight(.medium))
                         Spacer()
                         Image(systemName: "chevron.right")
-                            .font(.caption.weight(.semibold))
+                            .font(.caption.weight(.bold))
                             .foregroundStyle(.tertiary)
                     }
                 }
@@ -871,9 +933,11 @@ private struct SettingsView: View {
                 } label: {
                     HStack(spacing: 12) {
                         Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle(.green)
-                            .frame(width: 24)
+                            .frame(width: 28)
                         Text("Обновить расписание")
+                            .font(.body.weight(.medium))
                     }
                 }
                 .tint(.primary)
@@ -883,10 +947,12 @@ private struct SettingsView: View {
                         showDeleteConfirmation = true
                     } label: {
                         HStack(spacing: 12) {
-                            Image(systemName: "trash")
+                            Image(systemName: "trash.fill")
+                                .font(.system(size: 16, weight: .semibold))
                                 .foregroundStyle(.red)
-                                .frame(width: 24)
+                                .frame(width: 28)
                             Text("Удалить расписание")
+                                .font(.body.weight(.medium))
                         }
                     }
                 }
@@ -895,7 +961,9 @@ private struct SettingsView: View {
             Section("Подгруппа") {
                 Picker("Подгруппа", selection: $selectedSubgroup) {
                     ForEach(Subgroup.pickerValues, id: \.rawValue) { subgroup in
-                        Text(subgroup.title).tag(subgroup)
+                        Text(subgroup.title)
+                            .font(.body.weight(.semibold))
+                            .tag(subgroup)
                     }
                 }
                 .pickerStyle(.segmented)
@@ -905,7 +973,9 @@ private struct SettingsView: View {
                 Section("Оформление") {
                     Picker("Тема", selection: $appTheme) {
                         ForEach(AppTheme.allCases, id: \.self) { theme in
-                            Text(theme.title).tag(theme)
+                            Text(theme.title)
+                                .font(.body.weight(.semibold))
+                                .tag(theme)
                         }
                     }
                     .pickerStyle(.segmented)
@@ -916,14 +986,16 @@ private struct SettingsView: View {
                         string: "https://github.com/skyvxl/schedule-parser/blob/main/PRIVACY.md"
                     )!) {
                         HStack(spacing: 12) {
-                            Image(systemName: "hand.raised")
+                            Image(systemName: "hand.raised.fill")
+                                .font(.system(size: 16, weight: .semibold))
                                 .foregroundStyle(.blue)
-                                .frame(width: 24)
+                                .frame(width: 28)
                             Text("Политика конфиденциальности")
+                                .font(.body.weight(.medium))
                                 .foregroundStyle(.primary)
                             Spacer()
                             Image(systemName: "arrow.up.right")
-                                .font(.caption.weight(.semibold))
+                                .font(.caption.weight(.bold))
                                 .foregroundStyle(.tertiary)
                         }
                     }
@@ -931,14 +1003,16 @@ private struct SettingsView: View {
                         string: "https://github.com/skyvxl/schedule-parser/blob/main/TERMS.md"
                     )!) {
                         HStack(spacing: 12) {
-                            Image(systemName: "doc.text")
+                            Image(systemName: "doc.text.fill")
+                                .font(.system(size: 16, weight: .semibold))
                                 .foregroundStyle(.blue)
-                                .frame(width: 24)
+                                .frame(width: 28)
                             Text("Условия использования")
+                                .font(.body.weight(.medium))
                                 .foregroundStyle(.primary)
                             Spacer()
                             Image(systemName: "arrow.up.right")
-                                .font(.caption.weight(.semibold))
+                                .font(.caption.weight(.bold))
                                 .foregroundStyle(.tertiary)
                         }
                     }
@@ -946,26 +1020,31 @@ private struct SettingsView: View {
 
                 Section("О приложении") {
                     HStack(spacing: 12) {
-                        Image(systemName: "info.circle")
+                        Image(systemName: "info.circle.fill")
+                            .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle(.secondary)
-                            .frame(width: 24)
+                            .frame(width: 28)
                         Text("Версия")
+                            .font(.body.weight(.medium))
                         Spacer()
                         Text(appVersion)
+                            .font(.body.weight(.medium))
                             .foregroundStyle(.secondary)
                     }
                     Link(destination: URL(
                         string: "mailto:skyvxl@icloud.com"
                     )!) {
                         HStack(spacing: 12) {
-                            Image(systemName: "envelope")
+                            Image(systemName: "envelope.fill")
+                                .font(.system(size: 16, weight: .semibold))
                                 .foregroundStyle(.blue)
-                                .frame(width: 24)
+                                .frame(width: 28)
                             Text("Обратная связь")
+                                .font(.body.weight(.medium))
                                 .foregroundStyle(.primary)
                             Spacer()
                             Image(systemName: "arrow.up.right")
-                                .font(.caption.weight(.semibold))
+                                .font(.caption.weight(.bold))
                                 .foregroundStyle(.tertiary)
                         }
                     }
@@ -977,7 +1056,12 @@ private struct SettingsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button("Готово") { dismiss() }
+                Button {
+                    dismiss()
+                } label: {
+                    Text("Готово")
+                        .font(.body.weight(.semibold))
+                }
             }
         }
         .alert(
