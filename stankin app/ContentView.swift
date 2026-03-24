@@ -258,14 +258,10 @@ struct ContentView: View {
                 .font(.caption.weight(.bold))
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
-                .background(
-                    ZStack {
-                        Color.accentColor.opacity(0.2)
-                        Color.accentColor.opacity(0.1)
-                            .blur(radius: 4)
-                    },
-                    in: Capsule()
-                )
+                .background {
+                    Capsule()
+                        .fill(Color.accentColor.opacity(0.18))
+                }
                 .overlay(
                     Capsule()
                         .strokeBorder(
@@ -505,14 +501,10 @@ struct ContentView: View {
                     .font(.caption.weight(.semibold))
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
-                    .background(
-                        ZStack {
-                            classTypeColor(for: entry.classType).opacity(0.15)
-                            classTypeColor(for: entry.classType).opacity(0.08)
-                                .blur(radius: 4)
-                        },
-                        in: Capsule()
-                    )
+                    .background {
+                        Capsule()
+                            .fill(classTypeColor(for: entry.classType).opacity(0.15))
+                    }
                     .overlay(
                         Capsule()
                             .strokeBorder(
@@ -548,14 +540,10 @@ struct ContentView: View {
                         .font(.footnote.weight(.semibold))
                         .padding(.horizontal, 9)
                         .padding(.vertical, 4)
-                        .background(
-                            ZStack {
-                                Color.white.opacity(0.18)
-                                Color.white.opacity(0.08)
-                                    .blur(radius: 3)
-                            },
-                            in: Capsule()
-                        )
+                        .background {
+                            Capsule()
+                                .fill(Color.white.opacity(0.2))
+                        }
                         .overlay(
                             Capsule()
                                 .strokeBorder(.white.opacity(0.3), lineWidth: 0.5)
@@ -565,39 +553,16 @@ struct ContentView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            ZStack {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(.ultraThinMaterial)
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.05),
-                                Color.white.opacity(0.0)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-            }
-        )
-        .overlay(
+        .background {
             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.4),
-                            Color.white.opacity(0.1)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
-        )
-        .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
-        .shadow(color: Color.black.opacity(0.03), radius: 2, x: 0, y: 1)
+                .fill(.ultraThinMaterial)
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(.white.opacity(0.25), lineWidth: 1)
+        }
+        .compositingGroup()
+        .shadow(color: Color.black.opacity(0.07), radius: 6, x: 0, y: 3)
     }
 
     // MARK: - No Lessons Card
@@ -608,37 +573,14 @@ struct ContentView: View {
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 32)
-            .background(
-                ZStack {
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .fill(.ultraThinMaterial)
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color.white.opacity(0.03),
-                                    Color.white.opacity(0.0)
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                }
-            )
-            .overlay(
+            .background {
                 RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .strokeBorder(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.35),
-                                Color.white.opacity(0.15)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 1
-                    )
-            )
+                    .fill(.ultraThinMaterial)
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .strokeBorder(.white.opacity(0.25), lineWidth: 1)
+            }
             .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 3)
     }
 
@@ -679,39 +621,15 @@ struct ContentView: View {
         }
         .padding(28)
         .frame(maxWidth: .infinity)
-        .background(
-            ZStack {
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
-                    .fill(.ultraThinMaterial)
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.05),
-                                Color.white.opacity(0.0)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-            }
-        )
-        .overlay(
+        .background {
             RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .strokeBorder(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.4),
-                            Color.white.opacity(0.15)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1.5
-                )
-        )
-        .shadow(color: Color.black.opacity(0.06), radius: 12, x: 0, y: 6)
-        .shadow(color: Color.black.opacity(0.03), radius: 4, x: 0, y: 2)
+                .fill(.ultraThinMaterial)
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .strokeBorder(.white.opacity(0.3), lineWidth: 1.5)
+        }
+        .shadow(color: Color.black.opacity(0.08), radius: 10, x: 0, y: 5)
         .padding(.horizontal, 20)
     }
 
@@ -732,39 +650,15 @@ struct ContentView: View {
             }
             .padding(.horizontal, 32)
             .padding(.vertical, 24)
-            .background(
-                ZStack {
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .fill(.regularMaterial)
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color.white.opacity(0.08),
-                                    Color.white.opacity(0.0)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                }
-            )
-            .overlay(
+            .background {
                 RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .strokeBorder(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.5),
-                                Color.white.opacity(0.2)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 1.5
-                    )
-            )
-            .shadow(color: Color.black.opacity(0.15), radius: 20, x: 0, y: 10)
-            .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 3)
+                    .fill(.regularMaterial)
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .strokeBorder(.white.opacity(0.35), lineWidth: 1.5)
+            }
+            .shadow(color: Color.black.opacity(0.15), radius: 16, x: 0, y: 8)
         }
         .transition(.opacity.combined(with: .scale(scale: 0.95)))
     }
