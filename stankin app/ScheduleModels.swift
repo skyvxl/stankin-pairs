@@ -88,6 +88,33 @@ struct ScheduleEntry: Codable, Identifiable {
         let e = TimeSlot.slots[slotEnd]
         return "\(s.start) – \(e.end)"
     }
+
+    func progress(
+        on date: Date,
+        calendar: Calendar = Calendar(identifier: .gregorian)
+    )
+        -> (completed: Int, total: Int)?
+    {
+        let uniqueDates = Array(Set(dates)).sorted()
+        guard !uniqueDates.isEmpty else { return nil }
+
+        let targetDate = Self.progressDateFormatter.string(
+            from: calendar.startOfDay(for: date)
+        )
+        let completed = uniqueDates.filter { $0 <= targetDate }.count
+
+        return (
+            completed: min(completed, uniqueDates.count),
+            total: uniqueDates.count
+        )
+    }
+
+    private static let progressDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        return formatter
+    }()
 }
 
 struct GroupSchedule: Codable {
@@ -111,7 +138,8 @@ struct GroupSchedule: Codable {
 
         let target = Self.dateFmt.string(from: date)
 
-        return entries
+        return
+            entries
             .filter { $0.weekday == weekday }
             .filter { e in
                 subgroup == .all || e.subgroup == .all || e.subgroup == subgroup
@@ -175,9 +203,10 @@ enum ScheduleAPI {
     /// Расписание для конкретной группы.
     static func fetchSchedule(group: String) async throws -> GroupSchedule {
         let fileName = "\(group).json"
-        guard let encoded = fileName.addingPercentEncoding(
-            withAllowedCharacters: .urlPathAllowed
-        ),
+        guard
+            let encoded = fileName.addingPercentEncoding(
+                withAllowedCharacters: .urlPathAllowed
+            ),
             let url = URL(string: "\(baseURL)/\(encoded)")
         else {
             throw URLError(.badURL)
