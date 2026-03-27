@@ -6,14 +6,9 @@
 //
 
 import SwiftUI
-import UIKit
 
 @main
 struct stankin_appApp: App {
-    init() {
-        UIScrollView.appearance().scrollsToTop = false
-    }
-
     var body: some Scene {
         WindowGroup {
             ContentView()
