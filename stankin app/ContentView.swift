@@ -450,7 +450,7 @@ struct ContentView: View {
             } else {
                 LazyVStack(spacing: 10) {
                     ForEach(entries) { entry in
-                        lessonCard(entry)
+                        lessonCard(entry, on: date)
                     }
                 }
                 .padding(.horizontal, 18)
@@ -462,9 +462,13 @@ struct ContentView: View {
 
     // MARK: - Lesson Card (kept intact)
 
-    private func lessonCard(_ entry: ScheduleEntry) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
+    private func lessonCard(_ entry: ScheduleEntry, on date: Date) -> some View
+    {
+        let progress = entry.progress(on: date)
+        let badgeColor = classTypeColor(for: entry.classType)
+
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .center, spacing: 10) {
                 Text(entry.timeString)
                     .font(
                         .system(
@@ -475,27 +479,34 @@ struct ContentView: View {
                     )
                     .foregroundStyle(.primary)
                 Spacer()
-                Text(entry.classType.rawValue)
-                    .font(.caption.weight(.semibold))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background {
-                        Capsule()
-                            .fill(
-                                classTypeColor(for: entry.classType).opacity(
-                                    0.15
-                                )
-                            )
+
+                HStack(spacing: 6) {
+                    Text(entry.classType.rawValue)
+                        .font(.caption.weight(.semibold))
+                    if let progress {
+                        Text("·")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(badgeColor.opacity(0.65))
+
+                        Text("\(progress.completed)/\(progress.total)")
+                            .font(.caption.weight(.bold))
+                            .monospacedDigit()
+                            .foregroundStyle(.primary.opacity(0.9))
                     }
-                    .overlay(
-                        Capsule()
-                            .strokeBorder(
-                                classTypeColor(for: entry.classType).opacity(
-                                    0.3
-                                ),
-                                lineWidth: 0.5
-                            )
-                    )
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background {
+                    Capsule()
+                        .fill(badgeColor.opacity(0.15))
+                }
+                .overlay(
+                    Capsule()
+                        .strokeBorder(
+                            badgeColor.opacity(0.3),
+                            lineWidth: 0.5
+                        )
+                )
             }
 
             Text(entry.subject)
