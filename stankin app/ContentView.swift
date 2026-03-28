@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var store = ScheduleStore()
+    @Environment(\.colorScheme) private var colorScheme
     @State private var selectedDate = Calendar(identifier: .gregorian)
         .startOfDay(for: Date())
     @State private var isGroupPickerPresented = false
@@ -41,11 +42,15 @@ struct ContentView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if store.hasSchedule {
-                    scheduleView
-                } else {
-                    onboardingState
+            ZStack {
+                adaptiveBackground
+
+                Group {
+                    if store.hasSchedule {
+                        scheduleView
+                    } else {
+                        onboardingState
+                    }
                 }
             }
             .overlay {
@@ -57,28 +62,33 @@ struct ContentView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 if store.hasSchedule {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        HStack(spacing: 2) {
-                            Button {
-                                isDatePickerPresented = true
-                            } label: {
-                                Image(systemName: "calendar")
-                            }
-                            Button {
-                                isSettingsPresented = true
-                            } label: {
-                                Image(systemName: "gearshape")
-                            }
+                    ToolbarItemGroup(placement: .topBarTrailing) {
+                        Button {
+                            isDatePickerPresented = true
+                        } label: {
+                            Image(systemName: "calendar")
                         }
+                        .accessibilityLabel("Выбрать дату")
+
+                        Button {
+                            isSettingsPresented = true
+                        } label: {
+                            Image(systemName: "slider.horizontal.3")
+                        }
+                        .accessibilityLabel("Настройки")
                     }
+                    .sharedBackgroundVisibility(.visible)
                 }
             }
             .sheet(isPresented: $isDatePickerPresented) {
                 datePickerSheet
             }
-            .sheet(isPresented: $isSettingsPresented, onDismiss: {
-                settingsDetent = .medium
-            }) {
+            .sheet(
+                isPresented: $isSettingsPresented,
+                onDismiss: {
+                    settingsDetent = .medium
+                }
+            ) {
                 NavigationStack {
                     SettingsView(
                         groupName: store.schedule?.groupName,
@@ -97,8 +107,16 @@ struct ContentView: View {
                         }
                     )
                 }
-                .presentationDetents([.medium, .large], selection: $settingsDetent)
+                .preferredColorScheme(appTheme.colorScheme)
+                .presentationDetents(
+                    [.medium, .large],
+                    selection: $settingsDetent
+                )
                 .presentationDragIndicator(.visible)
+                .presentationCornerRadius(28)
+                .presentationBackground(
+                    Color(uiColor: .systemGroupedBackground)
+                )
             }
             .sheet(isPresented: $isGroupPickerPresented) {
                 GroupPickerView(store: store)
@@ -117,16 +135,7 @@ struct ContentView: View {
                 Text(store.errorMessage ?? "")
             }
         }
-        .onAppear { applyTheme(appTheme) }
-        .onChange(of: appTheme) { _, newTheme in applyTheme(newTheme) }
-    }
-
-    private func applyTheme(_ theme: AppTheme) {
-        guard let scene = UIApplication.shared.connectedScenes.first
-                as? UIWindowScene else { return }
-        for window in scene.windows {
-            window.overrideUserInterfaceStyle = theme.userInterfaceStyle
-        }
+        .preferredColorScheme(appTheme.colorScheme)
     }
 
     // MARK: - Date Picker Sheet
@@ -149,19 +158,24 @@ struct ContentView: View {
             )
             .datePickerStyle(.graphical)
             .environment(\.locale, Locale(identifier: "ru_RU"))
-            .padding(.horizontal)
+            .padding(.horizontal, 20)
+            .padding(.top, 8)
             .navigationTitle("Выберите дату")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Готово") {
+                    Button {
                         isDatePickerPresented = false
+                    } label: {
+                        Text("Готово")
+                            .font(.body.weight(.semibold))
                     }
                 }
             }
         }
         .presentationDetents([.height(480)])
         .presentationDragIndicator(.visible)
+        .presentationCornerRadius(28)
     }
 
     // MARK: - Schedule View
@@ -170,8 +184,16 @@ struct ContentView: View {
         VStack(spacing: 0) {
             weekStrip
             Divider()
+                .overlay(
+                    Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.06)
+                )
             dayPager
         }
+    }
+
+    private var adaptiveBackground: some View {
+        Color(uiColor: .systemGroupedBackground)
+            .ignoresSafeArea()
     }
 
     // MARK: - Week Strip
@@ -197,7 +219,6 @@ struct ContentView: View {
         calendar.isDateInToday(selectedDate)
     }
 
-    /// true — сегодня раньше (левее) выбранной даты → кнопка слева.
     private var isTodayBefore: Bool {
         calendar.startOfDay(for: Date()) < selectedDate
     }
@@ -207,29 +228,39 @@ struct ContentView: View {
             goToToday()
         } label: {
             Text("Сегодня")
-                .font(.caption.weight(.semibold))
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(
-                    Color.accentColor.opacity(0.15),
-                    in: Capsule()
+                .font(.caption.weight(.bold))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background {
+                    Capsule()
+                        .fill(Color.accentColor.opacity(0.18))
+                }
+                .overlay(
+                    Capsule()
+                        .strokeBorder(
+                            Color.accentColor.opacity(0.4),
+                            lineWidth: 0.5
+                        )
                 )
         }
+        .buttonStyle(.plain)
     }
 
     private var weekStrip: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 14) {
             ZStack {
                 Text(monthYearTitle)
                     .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
 
                 HStack {
-                    Button {
+                    weekArrowButton(
+                        systemName: "chevron.left",
+                        accessibilityLabel: "Предыдущая неделя"
+                    ) {
                         moveWeek(by: -1)
-                    } label: {
-                        Image(systemName: "chevron.left")
-                            .fontWeight(.semibold)
-                            .contentShape(Rectangle())
                     }
 
                     todayChip
@@ -242,14 +273,14 @@ struct ContentView: View {
                         .opacity(!isOnToday && !isTodayBefore ? 1 : 0)
                         .allowsHitTesting(!isOnToday && !isTodayBefore)
 
-                    Button {
+                    weekArrowButton(
+                        systemName: "chevron.right",
+                        accessibilityLabel: "Следующая неделя"
+                    ) {
                         moveWeek(by: 1)
-                    } label: {
-                        Image(systemName: "chevron.right")
-                            .fontWeight(.semibold)
-                            .contentShape(Rectangle())
                     }
                 }
+                .frame(height: 40)
                 .animation(.easeInOut(duration: 0.2), value: isOnToday)
                 .animation(.easeInOut(duration: 0.2), value: isTodayBefore)
             }
@@ -262,7 +293,8 @@ struct ContentView: View {
             }
             .padding(.horizontal, 8)
         }
-        .padding(.vertical, 8)
+        .padding(.top, 8)
+        .padding(.bottom, 10)
     }
 
     @ViewBuilder
@@ -272,35 +304,72 @@ struct ContentView: View {
         let dayNum = calendar.component(.day, from: date)
         let weekdayName = WeekStripFormatters.shortWeekday
             .string(from: date).lowercased()
+        let selectedTextColor: Color = colorScheme == .dark ? .white : .primary
+        let selectedSecondaryTextColor: Color =
+            colorScheme == .dark
+            ? .white.opacity(0.82)
+            : .primary.opacity(0.72)
 
         Button {
             withAnimation(.snappy(duration: 0.25)) {
                 selectedDate = calendar.startOfDay(for: date)
             }
         } label: {
-            VStack(spacing: 4) {
+            VStack(spacing: 3) {
                 Text(weekdayName)
-                    .font(.caption2.weight(.medium))
-                    .foregroundStyle(isSelected ? .white : .secondary)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(
+                        isSelected ? selectedSecondaryTextColor : .secondary
+                    )
 
                 Text("\(dayNum)")
                     .font(
-                        .callout
-                            .weight(isSelected ? .bold : .semibold)
+                        .system(size: 18, weight: .bold, design: .rounded)
                             .monospacedDigit()
                     )
                     .foregroundStyle(
                         isSelected
-                            ? .white
+                            ? selectedTextColor
                             : (isToday ? Color.accentColor : .primary)
                     )
+
+                if isToday {
+                    Circle()
+                        .fill(
+                            isSelected
+                                ? selectedTextColor.opacity(0.9)
+                                : Color.accentColor
+                        )
+                        .frame(width: 4, height: 4)
+                } else {
+                    Color.clear
+                        .frame(width: 4, height: 4)
+                }
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
+            .padding(.vertical, 6)
             .background {
                 if isSelected {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color.accentColor)
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(
+                            Color.accentColor.opacity(
+                                colorScheme == .dark ? 0.42 : 0.18
+                            )
+                        )
+                        .overlay {
+                            RoundedRectangle(
+                                cornerRadius: 16,
+                                style: .continuous
+                            )
+                            .stroke(
+                                Color.accentColor.opacity(
+                                    colorScheme == .dark ? 0.55 : 0.26
+                                ),
+                                lineWidth: 1
+                            )
+                        }
+                        .padding(.horizontal, 2)
+                        .padding(.vertical, 1)
                 }
             }
         }
@@ -317,7 +386,8 @@ struct ContentView: View {
         else { return }
         let clamped = max(
             Self.pagerDateRange.lowerBound,
-            min(d, Self.pagerDateRange.upperBound))
+            min(d, Self.pagerDateRange.upperBound)
+        )
         withAnimation(.snappy(duration: 0.25)) {
             selectedDate = clamped
         }
@@ -371,51 +441,81 @@ struct ContentView: View {
         let entries = store.entries(for: date)
 
         return ScrollView {
-            LazyVStack(spacing: 10) {
-                if entries.isEmpty {
-                    noLessonsCard
-                } else {
+            if entries.isEmpty {
+                noLessonsCard
+                    .frame(maxWidth: .infinity)
+                    .frame(minHeight: 320)
+                    .padding(.horizontal, 18)
+                    .padding(.top, 12)
+            } else {
+                LazyVStack(spacing: 10) {
                     ForEach(entries) { entry in
-                        lessonCard(entry)
+                        lessonCard(entry, on: date)
                     }
                 }
+                .padding(.horizontal, 18)
+                .padding(.top, 12)
+                .padding(.bottom, 40)
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
-            .padding(.bottom, 40)
         }
     }
 
     // MARK: - Lesson Card (kept intact)
 
-    private func lessonCard(_ entry: ScheduleEntry) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
+    private func lessonCard(_ entry: ScheduleEntry, on date: Date) -> some View
+    {
+        let progress = entry.progress(on: date)
+        let badgeColor = classTypeColor(for: entry.classType)
+
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .center, spacing: 10) {
                 Text(entry.timeString)
                     .font(
                         .system(
                             .subheadline,
                             design: .rounded,
-                            weight: .semibold
+                            weight: .bold
                         )
                     )
+                    .foregroundStyle(.primary)
                 Spacer()
-                Text(entry.classType.rawValue)
-                    .font(.caption)
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 4)
-                    .background(
-                        classTypeColor(for: entry.classType).opacity(0.2),
-                        in: Capsule()
-                    )
+
+                HStack(spacing: 6) {
+                    Text(entry.classType.rawValue)
+                        .font(.caption.weight(.semibold))
+                    if let progress {
+                        Text("·")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(badgeColor.opacity(0.65))
+
+                        Text("\(progress.completed)/\(progress.total)")
+                            .font(.caption.weight(.bold))
+                            .monospacedDigit()
+                            .foregroundStyle(.primary.opacity(0.9))
+                    }
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background {
+                    Capsule()
+                        .fill(badgeColor.opacity(0.15))
+                }
+                .overlay(
+                    Capsule()
+                        .strokeBorder(
+                            badgeColor.opacity(0.3),
+                            lineWidth: 0.5
+                        )
+                )
             }
 
             Text(entry.subject)
-                .font(.headline)
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(.primary)
 
             if let teacher = entry.teacher, !teacher.isEmpty {
                 Text(teacher)
-                    .font(.subheadline)
+                    .font(.subheadline.weight(.medium))
                     .foregroundStyle(.secondary)
             }
 
@@ -423,116 +523,124 @@ struct ContentView: View {
                 Label(
                     entry.isRemote
                         ? "Дистанционно" : (entry.room ?? "Дистанционно"),
-                    systemImage: entry.isRemote ? "video" : "building.2"
+                    systemImage: entry.isRemote
+                        ? "video.fill" : "building.2.fill"
                 )
-                .font(.footnote)
+                .font(.footnote.weight(.medium))
                 .foregroundStyle(.secondary)
 
                 Spacer()
 
                 if entry.subgroup != .all {
                     Text("Подгруппа \(entry.subgroup.rawValue)")
-                        .font(.footnote)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(.white.opacity(0.14), in: Capsule())
+                        .font(.footnote.weight(.semibold))
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 4)
+                        .background {
+                            Capsule()
+                                .fill(Color.white.opacity(0.2))
+                        }
+                        .overlay(
+                            Capsule()
+                                .strokeBorder(
+                                    .white.opacity(0.3),
+                                    lineWidth: 0.5
+                                )
+                        )
                 }
             }
         }
-        .padding(14)
+        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            .thinMaterial,
-            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(.white.opacity(0.2), lineWidth: 1)
-        )
+        .background {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(.ultraThinMaterial)
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(.white.opacity(0.25), lineWidth: 1)
+        }
+        .compositingGroup()
+        .shadow(color: Color.black.opacity(0.07), radius: 6, x: 0, y: 3)
     }
 
     // MARK: - No Lessons Card
 
     private var noLessonsCard: some View {
-        Text("Пар нет")
-            .font(.headline)
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 24)
-            .background(
-                .ultraThinMaterial,
-                in: RoundedRectangle(cornerRadius: 20, style: .continuous)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .strokeBorder(.white.opacity(0.25), lineWidth: 1)
-            )
+        ContentUnavailableView {
+            Label("Пар нет", systemImage: "calendar")
+        } description: {
+            Text("На этот день занятий нет.")
+        }
     }
 
     // MARK: - Onboarding
 
     private var onboardingState: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "person.2.circle")
-                .font(.system(size: 34, weight: .medium))
-
-            Text("Нет расписания")
-                .font(.title3.weight(.semibold))
-
-            Text("Выберите вашу группу, и приложение загрузит расписание.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-
-            Button {
+        ContentUnavailableView {
+            Label("Нет расписания", systemImage: "calendar.badge.clock")
+        } description: {
+            Text("Выберите группу, и приложение загрузит расписание.")
+        } actions: {
+            Button("Выбрать группу") {
                 isGroupPickerPresented = true
-            } label: {
-                Text("Выбрать группу")
-                    .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.glassProminent)
         }
-        .padding(22)
-        .frame(maxWidth: .infinity)
-        .background(
-            .ultraThinMaterial,
-            in: RoundedRectangle(cornerRadius: 24, style: .continuous)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(.white.opacity(0.25), lineWidth: 1)
-        )
-        .padding(.horizontal, 16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, 20)
     }
 
     // MARK: - Loading Overlay
 
     private var loadingOverlay: some View {
         ZStack {
-            Color.black.opacity(0.12)
+            Color.black.opacity(0.2)
                 .ignoresSafeArea()
+                .background(.ultraThinMaterial)
 
-            VStack(spacing: 10) {
+            VStack(spacing: 12) {
                 ProgressView()
                     .progressViewStyle(.circular)
+                    .scaleEffect(1.1)
                 Text("Загружаю расписание…")
-                    .font(.subheadline)
+                    .font(.subheadline.weight(.semibold))
             }
-            .padding(.horizontal, 26)
-            .padding(.vertical, 18)
-            .background(
-                .ultraThinMaterial,
-                in: RoundedRectangle(cornerRadius: 20, style: .continuous)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .strokeBorder(.white.opacity(0.25), lineWidth: 1)
+            .padding(.horizontal, 32)
+            .padding(.vertical, 24)
+            .glassEffect(
+                .regular,
+                in: RoundedRectangle(cornerRadius: 26, style: .continuous)
             )
         }
-        .transition(.opacity)
+        .transition(.opacity.combined(with: .scale(scale: 0.95)))
     }
 
     // MARK: - Helpers
+
+    @ViewBuilder
+    private func weekArrowButton(
+        systemName: String,
+        accessibilityLabel: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(.primary)
+                .frame(width: 32, height: 32)
+                .background {
+                    Circle()
+                        .fill(.ultraThinMaterial)
+                }
+                .overlay {
+                    Circle()
+                        .strokeBorder(.white.opacity(0.25), lineWidth: 0.5)
+                }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityLabel)
+    }
 
     private func classTypeColor(for type: ClassType) -> Color {
         switch type {
@@ -562,6 +670,7 @@ private struct GroupPickerView: View {
             Group {
                 if store.availableGroups.isEmpty && store.isLoadingGroups {
                     ProgressView("Загрузка групп…")
+                        .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if store.availableGroups.isEmpty {
                     ContentUnavailableView(
@@ -574,27 +683,53 @@ private struct GroupPickerView: View {
                 } else {
                     List(filteredGroups, id: \.self) { group in
                         Button {
-                            store.loadSchedule(group: group)
                             dismiss()
+                            guard group != store.schedule?.groupName else {
+                                return
+                            }
+                            store.loadSchedule(group: group)
                         } label: {
-                            Text(group)
-                                .foregroundStyle(.primary)
+                            HStack(spacing: 12) {
+                                Text(group)
+                                    .font(.body.weight(.medium))
+                                    .foregroundStyle(.primary)
+
+                                Spacer()
+
+                                if group == store.schedule?.groupName {
+                                    Image(systemName: "checkmark")
+                                        .font(.footnote.weight(.bold))
+                                        .foregroundStyle(.tint)
+                                }
+                            }
                         }
                     }
+                    .listStyle(.insetGrouped)
                     .searchable(
                         text: $searchText,
                         prompt: "Поиск группы"
                     )
+                    .overlay {
+                        if !searchText.isEmpty && filteredGroups.isEmpty {
+                            ContentUnavailableView.search(text: searchText)
+                        }
+                    }
                 }
             }
             .navigationTitle("Выберите группу")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Закрыть") { dismiss() }
+                    Button {
+                        dismiss()
+                    } label: {
+                        Text("Закрыть")
+                            .font(.body.weight(.semibold))
+                    }
                 }
             }
         }
+        .presentationCornerRadius(28)
         .onAppear {
             store.fetchGroups()
         }
@@ -609,16 +744,16 @@ private enum AppTheme: String, CaseIterable {
     var title: String {
         switch self {
         case .system: return "Системная"
-        case .light:  return "Светлая"
-        case .dark:   return "Тёмная"
+        case .light: return "Светлая"
+        case .dark: return "Тёмная"
         }
     }
 
-    var userInterfaceStyle: UIUserInterfaceStyle {
+    var colorScheme: ColorScheme? {
         switch self {
-        case .system: return .unspecified
-        case .light:  return .light
-        case .dark:   return .dark
+        case .system: return nil
+        case .light: return .light
+        case .dark: return .dark
         }
     }
 }
@@ -639,7 +774,9 @@ private struct SettingsView: View {
     @State private var showDeleteConfirmation = false
 
     private var appVersion: String {
-        let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+        let v =
+            Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
+            ?? "1.0"
         let b = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
         return "\(v) (\(b))"
     }
@@ -648,12 +785,15 @@ private struct SettingsView: View {
         Form {
             Section("Расписание") {
                 HStack(spacing: 12) {
-                    Image(systemName: "person.2")
+                    Image(systemName: "person.2.fill")
+                        .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(.blue)
-                        .frame(width: 24)
+                        .frame(width: 28)
                     Text("Группа")
+                        .font(.body.weight(.medium))
                     Spacer()
                     Text(groupName ?? "Не выбрана")
+                        .font(.body.weight(.medium))
                         .foregroundStyle(.secondary)
                 }
 
@@ -665,39 +805,47 @@ private struct SettingsView: View {
                 } label: {
                     HStack(spacing: 12) {
                         Image(systemName: "arrow.triangle.2.circlepath")
+                            .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle(.orange)
-                            .frame(width: 24)
+                            .frame(width: 28)
                         Text("Сменить группу")
+                            .font(.body.weight(.medium))
                         Spacer()
                         Image(systemName: "chevron.right")
-                            .font(.caption.weight(.semibold))
+                            .font(.caption.weight(.bold))
                             .foregroundStyle(.tertiary)
                     }
                 }
                 .tint(.primary)
 
-                Button {
-                    onRefresh()
-                    dismiss()
-                } label: {
-                    HStack(spacing: 12) {
-                        Image(systemName: "arrow.clockwise")
-                            .foregroundStyle(.green)
-                            .frame(width: 24)
-                        Text("Обновить расписание")
+                if hasSchedule {
+                    Button {
+                        onRefresh()
+                        dismiss()
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(.green)
+                                .frame(width: 28)
+                            Text("Обновить расписание")
+                                .font(.body.weight(.medium))
+                        }
                     }
+                    .tint(.primary)
                 }
-                .tint(.primary)
 
                 if hasSchedule {
                     Button(role: .destructive) {
                         showDeleteConfirmation = true
                     } label: {
                         HStack(spacing: 12) {
-                            Image(systemName: "trash")
+                            Image(systemName: "trash.fill")
+                                .font(.system(size: 16, weight: .semibold))
                                 .foregroundStyle(.red)
-                                .frame(width: 24)
+                                .frame(width: 28)
                             Text("Удалить расписание")
+                                .font(.body.weight(.medium))
                         }
                     }
                 }
@@ -706,7 +854,9 @@ private struct SettingsView: View {
             Section("Подгруппа") {
                 Picker("Подгруппа", selection: $selectedSubgroup) {
                     ForEach(Subgroup.pickerValues, id: \.rawValue) { subgroup in
-                        Text(subgroup.title).tag(subgroup)
+                        Text(subgroup.title)
+                            .font(.body.weight(.semibold))
+                            .tag(subgroup)
                     }
                 }
                 .pickerStyle(.segmented)
@@ -716,40 +866,52 @@ private struct SettingsView: View {
                 Section("Оформление") {
                     Picker("Тема", selection: $appTheme) {
                         ForEach(AppTheme.allCases, id: \.self) { theme in
-                            Text(theme.title).tag(theme)
+                            Text(theme.title)
+                                .font(.body.weight(.semibold))
+                                .tag(theme)
                         }
                     }
                     .pickerStyle(.segmented)
                 }
 
                 Section("Правила пользования") {
-                    Link(destination: URL(
-                        string: "https://github.com/skyvxl/schedule-parser/blob/main/PRIVACY.md"
-                    )!) {
+                    Link(
+                        destination: URL(
+                            string:
+                                "https://github.com/skyvxl/schedule-parser/blob/main/PRIVACY.md"
+                        )!
+                    ) {
                         HStack(spacing: 12) {
-                            Image(systemName: "hand.raised")
+                            Image(systemName: "hand.raised.fill")
+                                .font(.system(size: 16, weight: .semibold))
                                 .foregroundStyle(.blue)
-                                .frame(width: 24)
+                                .frame(width: 28)
                             Text("Политика конфиденциальности")
+                                .font(.body.weight(.medium))
                                 .foregroundStyle(.primary)
                             Spacer()
                             Image(systemName: "arrow.up.right")
-                                .font(.caption.weight(.semibold))
+                                .font(.caption.weight(.bold))
                                 .foregroundStyle(.tertiary)
                         }
                     }
-                    Link(destination: URL(
-                        string: "https://github.com/skyvxl/schedule-parser/blob/main/TERMS.md"
-                    )!) {
+                    Link(
+                        destination: URL(
+                            string:
+                                "https://github.com/skyvxl/schedule-parser/blob/main/TERMS.md"
+                        )!
+                    ) {
                         HStack(spacing: 12) {
-                            Image(systemName: "doc.text")
+                            Image(systemName: "doc.text.fill")
+                                .font(.system(size: 16, weight: .semibold))
                                 .foregroundStyle(.blue)
-                                .frame(width: 24)
+                                .frame(width: 28)
                             Text("Условия использования")
+                                .font(.body.weight(.medium))
                                 .foregroundStyle(.primary)
                             Spacer()
                             Image(systemName: "arrow.up.right")
-                                .font(.caption.weight(.semibold))
+                                .font(.caption.weight(.bold))
                                 .foregroundStyle(.tertiary)
                         }
                     }
@@ -757,38 +919,52 @@ private struct SettingsView: View {
 
                 Section("О приложении") {
                     HStack(spacing: 12) {
-                        Image(systemName: "info.circle")
+                        Image(systemName: "info.circle.fill")
+                            .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle(.secondary)
-                            .frame(width: 24)
+                            .frame(width: 28)
                         Text("Версия")
+                            .font(.body.weight(.medium))
                         Spacer()
                         Text(appVersion)
+                            .font(.body.weight(.medium))
                             .foregroundStyle(.secondary)
                     }
-                    Link(destination: URL(
-                        string: "mailto:skyvxl@icloud.com"
-                    )!) {
+                    Link(
+                        destination: URL(
+                            string: "mailto:skyvxl@icloud.com"
+                        )!
+                    ) {
                         HStack(spacing: 12) {
-                            Image(systemName: "envelope")
+                            Image(systemName: "envelope.fill")
+                                .font(.system(size: 16, weight: .semibold))
                                 .foregroundStyle(.blue)
-                                .frame(width: 24)
+                                .frame(width: 28)
                             Text("Обратная связь")
+                                .font(.body.weight(.medium))
                                 .foregroundStyle(.primary)
                             Spacer()
                             Image(systemName: "arrow.up.right")
-                                .font(.caption.weight(.semibold))
+                                .font(.caption.weight(.bold))
                                 .foregroundStyle(.tertiary)
                         }
                     }
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(Color(uiColor: .systemGroupedBackground))
         .animation(.default, value: isExpanded)
         .navigationTitle("Настройки")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button("Готово") { dismiss() }
+                Button {
+                    dismiss()
+                } label: {
+                    Text("Готово")
+                        .font(.body.weight(.semibold))
+                }
             }
         }
         .alert(
