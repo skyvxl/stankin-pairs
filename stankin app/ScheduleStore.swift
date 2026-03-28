@@ -96,7 +96,9 @@ final class ScheduleStore: ObservableObject {
         else { return nil }
 
         try? FileManager.default.createDirectory(
-            at: folder, withIntermediateDirectories: true)
+            at: folder,
+            withIntermediateDirectories: true
+        )
         return folder.appendingPathComponent("schedule_cache.json")
     }
 
