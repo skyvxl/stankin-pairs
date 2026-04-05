@@ -13,7 +13,7 @@ struct ScheduleLessonCard: View {
     }
 
     var body: some View {
-        SchedulePanel(style: .card, cornerRadius: 28, padding: 18) {
+        SchedulePanel(style: .plain, cornerRadius: 28, padding: 18) {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .top, spacing: 12) {
                     VStack(alignment: .leading, spacing: 4) {

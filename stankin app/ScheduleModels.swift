@@ -95,17 +95,27 @@ struct ScheduleEntry: Codable, Identifiable {
     )
         -> (completed: Int, total: Int)?
     {
-        let uniqueDates = Array(Set(dates)).sorted()
-        guard !uniqueDates.isEmpty else { return nil }
-
         let targetDate = Self.progressDateFormatter.string(
             from: calendar.startOfDay(for: date)
         )
-        let completed = uniqueDates.filter { $0 <= targetDate }.count
+        var seenDates: Set<String> = []
+        var total = 0
+        var completed = 0
+
+        for day in dates {
+            guard seenDates.insert(day).inserted else { continue }
+            total += 1
+
+            if day <= targetDate {
+                completed += 1
+            }
+        }
+
+        guard total > 0 else { return nil }
 
         return (
-            completed: min(completed, uniqueDates.count),
-            total: uniqueDates.count
+            completed: min(completed, total),
+            total: total
         )
     }
 
@@ -138,14 +148,20 @@ struct GroupSchedule: Codable {
 
         let target = Self.dateFmt.string(from: date)
 
-        return
-            entries
-            .filter { $0.weekday == weekday }
-            .filter { e in
-                subgroup == .all || e.subgroup == .all || e.subgroup == subgroup
-            }
-            .filter { $0.dates.contains(target) }
-            .sorted { $0.slotStart < $1.slotStart }
+        var result: [ScheduleEntry] = []
+        result.reserveCapacity(entries.count / 6)
+
+        for entry in entries {
+            guard entry.weekday == weekday else { continue }
+            guard subgroup == .all || entry.subgroup == .all || entry.subgroup == subgroup
+            else { continue }
+            guard entry.dates.contains(target) else { continue }
+
+            result.append(entry)
+        }
+
+        result.sort { $0.slotStart < $1.slotStart }
+        return result
     }
 
     // MARK: JSON
