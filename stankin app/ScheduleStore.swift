@@ -4,12 +4,22 @@ import Observation
 @MainActor
 @Observable
 final class ScheduleStore {
-    private(set) var schedule: GroupSchedule?
-    var selectedSubgroup: Subgroup = .all
+    private(set) var schedule: GroupSchedule? {
+        didSet {
+            dayEntriesCache.removeAll(keepingCapacity: true)
+        }
+    }
+    var selectedSubgroup: Subgroup = .all {
+        didSet {
+            guard oldValue != selectedSubgroup else { return }
+            dayEntriesCache.removeAll(keepingCapacity: true)
+        }
+    }
     var errorMessage: String?
     var isLoading = false
     var isLoadingGroups = false
     private(set) var availableGroups: [String] = []
+    private var dayEntriesCache: [DayEntriesCacheKey: [ScheduleEntry]] = [:]
 
     var hasSchedule: Bool {
         schedule != nil
@@ -36,7 +46,21 @@ final class ScheduleStore {
     }
 
     func entries(for date: Date) -> [ScheduleEntry] {
-        schedule?.forDate(date, subgroup: selectedSubgroup) ?? []
+        guard let schedule else { return [] }
+
+        let normalizedDate = ScheduleCalendar.russian.startOfDay(for: date)
+        let cacheKey = DayEntriesCacheKey(
+            day: normalizedDate,
+            subgroup: selectedSubgroup
+        )
+
+        if let cached = dayEntriesCache[cacheKey] {
+            return cached
+        }
+
+        let resolved = schedule.forDate(normalizedDate, subgroup: selectedSubgroup)
+        dayEntriesCache[cacheKey] = resolved
+        return resolved
     }
 
     func fetchGroupsIfNeeded() async {
@@ -104,6 +128,11 @@ final class ScheduleStore {
             availableGroups = ScheduleFixtures.availableGroups
         }
     }
+}
+
+private struct DayEntriesCacheKey: Hashable {
+    let day: Date
+    let subgroup: Subgroup
 }
 
 private extension ScheduleStore {

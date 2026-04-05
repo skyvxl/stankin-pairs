@@ -4,6 +4,7 @@ enum ScheduleSurfaceStyle {
     case card
     case elevated
     case glass
+    case plain
 }
 
 enum ScheduleBackdropStyle {
@@ -195,6 +196,22 @@ private struct SchedulePanelStyleModifier<S: InsettableShape>: ViewModifier {
                 .glassEffect(
                     .regular.tint(.white.opacity(colorScheme == .dark ? 0.04 : 0.08)),
                     in: shape
+                )
+
+        case .plain:
+            content
+                .background {
+                    shape.fill(fillColor)
+                }
+                .overlay {
+                    shape
+                        .strokeBorder(strokeColor, lineWidth: 0.7)
+                }
+                .shadow(
+                    color: Color.black.opacity(colorScheme == .dark ? 0.16 : 0.05),
+                    radius: colorScheme == .dark ? 14 : 10,
+                    x: 0,
+                    y: 6
                 )
         }
     }

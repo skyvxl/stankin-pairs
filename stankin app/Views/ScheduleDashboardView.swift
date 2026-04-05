@@ -6,7 +6,7 @@ struct ScheduleDashboardView: View {
 
     @Binding var selectedDate: Date
 
-    @State private var scrolledDateID: String?
+    @State private var scrolledDate: Date?
 
     private var normalizedSelectedDate: Date {
         calendar.startOfDay(for: selectedDate)
@@ -29,23 +29,24 @@ struct ScheduleDashboardView: View {
             dayPager
         }
         .onAppear {
-            scrolledDateID = normalizedSelectedDate.dayID
+            scrolledDate = normalizedSelectedDate
         }
         .onChange(of: selectedDate) { _, newValue in
             let normalized = calendar.startOfDay(for: newValue)
-            let id = normalized.dayID
 
-            guard scrolledDateID != id else { return }
+            if let scrolledDate,
+                calendar.isDate(scrolledDate, inSameDayAs: normalized)
+            {
+                return
+            }
 
             withAnimation(.snappy(duration: 0.22)) {
-                scrolledDateID = id
+                scrolledDate = normalized
             }
         }
-        .onChange(of: scrolledDateID) { _, newID in
-            guard let newID else { return }
-            guard let date = ScheduleFormatters.dayID.date(from: newID) else { return }
-
-            let normalized = calendar.startOfDay(for: date)
+        .onChange(of: scrolledDate) { _, newDate in
+            guard let newDate else { return }
+            let normalized = calendar.startOfDay(for: newDate)
             if !calendar.isDate(normalized, inSameDayAs: selectedDate) {
                 selectedDate = normalized
             }
@@ -57,7 +58,7 @@ private extension ScheduleDashboardView {
     var dayPager: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             LazyHStack(spacing: 0) {
-                ForEach(pagerDates, id: \.dayID) { date in
+                ForEach(pagerDates, id: \.self) { date in
                     ScheduleDayPage(
                         date: date,
                         entries: store.entries(for: date),
@@ -69,7 +70,7 @@ private extension ScheduleDashboardView {
             .scrollTargetLayout()
         }
         .scrollTargetBehavior(.paging)
-        .scrollPosition(id: $scrolledDateID)
+        .scrollPosition(id: $scrolledDate)
         .scrollIndicators(.hidden)
     }
 }
