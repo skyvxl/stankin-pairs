@@ -1,16 +1,19 @@
-import Combine
 import Foundation
+import Observation
 
 @MainActor
-final class ScheduleStore: ObservableObject {
-    @Published private(set) var schedule: GroupSchedule?
-    @Published var selectedSubgroup: Subgroup = .all
-    @Published var errorMessage: String?
-    @Published var isLoading = false
-    @Published var isLoadingGroups = false
-    @Published var availableGroups: [String] = []
+@Observable
+final class ScheduleStore {
+    private(set) var schedule: GroupSchedule?
+    var selectedSubgroup: Subgroup = .all
+    var errorMessage: String?
+    var isLoading = false
+    var isLoadingGroups = false
+    private(set) var availableGroups: [String] = []
 
-    var hasSchedule: Bool { schedule != nil }
+    var hasSchedule: Bool {
+        schedule != nil
+    }
 
     var navigationTitle: String {
         schedule?.groupName ?? "Расписание"
@@ -21,58 +24,71 @@ final class ScheduleStore: ObservableObject {
     }
 
     init() {
-        loadCachedSchedule()
+        if AppLaunchContext.shouldResetPersistentState {
+            clearPersistedState()
+        }
+
+        if let fixtureMode = AppLaunchContext.fixtureMode {
+            applyFixture(mode: fixtureMode)
+        } else {
+            loadCachedSchedule()
+        }
     }
 
     func entries(for date: Date) -> [ScheduleEntry] {
         schedule?.forDate(date, subgroup: selectedSubgroup) ?? []
     }
 
-    // MARK: - Загрузка списка групп
+    func fetchGroupsIfNeeded() async {
+        if AppLaunchContext.fixtureMode != nil {
+            availableGroups = ScheduleFixtures.availableGroups
+            return
+        }
 
-    func fetchGroups() {
-        guard availableGroups.isEmpty else { return }
+        guard availableGroups.isEmpty, !isLoadingGroups else { return }
+
         isLoadingGroups = true
+        defer { isLoadingGroups = false }
 
-        Task {
-            do {
-                let groups = try await ScheduleAPI.fetchGroups()
-                availableGroups = groups.sorted()
-            } catch {
-                errorMessage = "Не удалось загрузить список групп"
-            }
-            isLoadingGroups = false
+        do {
+            availableGroups = try await ScheduleAPI.fetchGroups().sorted()
+        } catch {
+            errorMessage = "Не удалось загрузить список групп"
         }
     }
 
-    // MARK: - Выбор группы → загрузка расписания
+    func loadSchedule(group: String) async {
+        if AppLaunchContext.fixtureMode != nil {
+            let result = ScheduleFixtures.schedule(named: group)
+            schedule = result
+            availableGroups = ScheduleFixtures.availableGroups
+            UserDefaults.standard.set(group, forKey: "selectedGroup")
+            cacheSchedule(result)
+            return
+        }
 
-    func loadSchedule(group: String) {
+        guard !isLoading else { return }
+
         isLoading = true
         errorMessage = nil
 
-        Task {
-            do {
-                let result = try await ScheduleAPI.fetchSchedule(group: group)
-                schedule = result
-                UserDefaults.standard.set(group, forKey: "selectedGroup")
-                cacheSchedule(result)
-            } catch {
-                errorMessage =
-                    "Не удалось загрузить расписание: \(error.localizedDescription)"
-            }
-            isLoading = false
+        defer { isLoading = false }
+
+        do {
+            let result = try await ScheduleAPI.fetchSchedule(group: group)
+            schedule = result
+            UserDefaults.standard.set(group, forKey: "selectedGroup")
+            cacheSchedule(result)
+        } catch {
+            errorMessage =
+                "Не удалось загрузить расписание: \(error.localizedDescription)"
         }
     }
 
-    // MARK: - Обновить текущее расписание
-
-    func refreshSchedule() {
+    func refreshSchedule() async {
         guard let group = savedGroupName else { return }
-        loadSchedule(group: group)
+        await loadSchedule(group: group)
     }
-
-    // MARK: - Удаление
 
     func removeSchedule() {
         schedule = nil
@@ -83,36 +99,73 @@ final class ScheduleStore: ObservableObject {
         if let url = cacheURL() {
             try? FileManager.default.removeItem(at: url)
         }
+
+        if AppLaunchContext.fixtureMode != nil {
+            availableGroups = ScheduleFixtures.availableGroups
+        }
+    }
+}
+
+private extension ScheduleStore {
+    func applyFixture(mode: LaunchFixtureMode) {
+        availableGroups = ScheduleFixtures.availableGroups
+        selectedSubgroup = .all
+        errorMessage = nil
+
+        switch mode {
+        case .empty:
+            schedule = nil
+
+        case .schedule:
+            let group = savedGroupName ?? "ИДБ-23-02"
+            let fixtureSchedule = ScheduleFixtures.schedule(named: group)
+            schedule = fixtureSchedule
+            UserDefaults.standard.set(group, forKey: "selectedGroup")
+        }
     }
 
-    // MARK: - Кэш
+    func clearPersistedState() {
+        UserDefaults.standard.removeObject(forKey: "selectedGroup")
 
-    private func cacheURL() -> URL? {
+        if let url = cacheURL() {
+            try? FileManager.default.removeItem(at: url)
+        }
+    }
+
+    func cacheURL() -> URL? {
         guard
             let folder = FileManager.default.urls(
                 for: .applicationSupportDirectory,
                 in: .userDomainMask
             ).first
-        else { return nil }
+        else {
+            return nil
+        }
 
         try? FileManager.default.createDirectory(
             at: folder,
             withIntermediateDirectories: true
         )
+
         return folder.appendingPathComponent("schedule_cache.json")
     }
 
-    private func cacheSchedule(_ parsed: GroupSchedule) {
+    func cacheSchedule(_ parsed: GroupSchedule) {
         guard let url = cacheURL(),
             let data = GroupSchedule.toJSON(parsed)
-        else { return }
+        else {
+            return
+        }
+
         try? data.write(to: url, options: .atomic)
     }
 
-    private func loadCachedSchedule() {
+    func loadCachedSchedule() {
         guard let url = cacheURL(),
             FileManager.default.fileExists(atPath: url.path)
-        else { return }
+        else {
+            return
+        }
 
         if let data = try? Data(contentsOf: url),
             let cached = GroupSchedule.fromJSON(data)
