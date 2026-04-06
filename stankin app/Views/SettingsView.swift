@@ -132,16 +132,20 @@ private extension SettingsView {
 
     var legalSection: some View {
         Section("Документы") {
-            Link(destination: URL(string: "https://github.com/skyvxl/schedule-parser/blob/main/PRIVACY.md")!) {
-                SettingsLinkLabel(
+            NavigationLink {
+                PrivacyPolicyView()
+            } label: {
+                SettingsRowLabel(
                     title: "Политика конфиденциальности",
                     systemImage: "hand.raised.fill",
                     tint: .blue
                 )
             }
 
-            Link(destination: URL(string: "https://github.com/skyvxl/schedule-parser/blob/main/TERMS.md")!) {
-                SettingsLinkLabel(
+            NavigationLink {
+                TermsOfUseView()
+            } label: {
+                SettingsRowLabel(
                     title: "Условия использования",
                     systemImage: "doc.text.fill",
                     tint: .blue
