@@ -4,6 +4,8 @@ struct ScheduleLessonCard: View {
     let entry: ScheduleEntry
     let date: Date
 
+    @Environment(\.colorScheme) private var colorScheme
+
     private var progress: (completed: Int, total: Int)? {
         entry.progress(on: date)
     }
@@ -74,7 +76,10 @@ struct ScheduleLessonCard: View {
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .glassEffect(
+            .regular.tint(.white.opacity(colorScheme == .dark ? 0.02 : 0.09)),
+            in: RoundedRectangle(cornerRadius: 28, style: .continuous)
+        )
     }
 }
 

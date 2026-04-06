@@ -37,25 +37,26 @@ struct ScheduleDashboardView: View {
                 selectedDate: $selectedDate
             )
 
-            dayPager
-                .safeAreaInset(edge: .bottom) {
-                    if !isOnToday {
-                        HStack {
-                            Spacer()
-                            backToTodayButton
-                            Spacer()
-                        }
-                        .padding(.bottom, 10)
-                        .transition(
-                            .scale(scale: 0.85, anchor: .bottom)
-                            .combined(with: .opacity)
-                        )
+            ZStack(alignment: .bottom) {
+                dayPager
+
+                if !isOnToday {
+                    HStack {
+                        Spacer()
+                        backToTodayButton
+                        Spacer()
                     }
+                    .padding(.bottom, 10)
+                    .transition(
+                        .scale(scale: 0.85, anchor: .bottom)
+                        .combined(with: .opacity)
+                    )
                 }
-                .animation(
-                    .spring(duration: 0.35, bounce: 0.2),
-                    value: isOnToday
-                )
+            }
+            .animation(
+                .spring(duration: 0.35, bounce: 0.2),
+                value: isOnToday
+            )
         }
         .onAppear {
             scrolledOffset = pagerOffset(for: selectedDate)
@@ -108,8 +109,8 @@ private extension ScheduleDashboardView {
             }
         } label: {
             HStack(spacing: 6) {
-                Image(systemName: "arrow.uturn.backward")
-                    .font(.system(size: 13, weight: .bold))
+                Image(systemName: "arrow.left")
+                    .font(.system(size: 13, weight: .semibold))
                 Text("Сегодня")
                     .font(.subheadline.weight(.semibold))
             }
@@ -323,6 +324,8 @@ private struct ScheduleDayPage: View {
     // so the last card is never hidden behind the floating button.
     let extraBottomPadding: Bool
 
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
@@ -337,11 +340,12 @@ private struct ScheduleDayPage: View {
                             }
                         }
                     }
+                    .id(colorScheme)
                 }
             }
             .padding(.horizontal, 16)
             .padding(.top, 14)
-            .padding(.bottom, extraBottomPadding ? 80 : 36)
+            .padding(.bottom, extraBottomPadding ? 68 : 56)
         }
         .scrollEdgeEffectStyle(.soft, for: .bottom)
         .scrollIndicators(.hidden)
