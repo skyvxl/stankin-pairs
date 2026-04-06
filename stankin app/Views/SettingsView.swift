@@ -101,8 +101,6 @@ private extension SettingsView {
             }
         } header: {
             Text("Расписание")
-        } footer: {
-            Text("Активная группа и быстрые действия с локальным кэшем.")
         }
     }
 
@@ -137,14 +135,16 @@ private extension SettingsView {
             Link(destination: URL(string: "https://github.com/skyvxl/schedule-parser/blob/main/PRIVACY.md")!) {
                 SettingsLinkLabel(
                     title: "Политика конфиденциальности",
-                    systemImage: "hand.raised.fill"
+                    systemImage: "hand.raised.fill",
+                    tint: .blue
                 )
             }
 
             Link(destination: URL(string: "https://github.com/skyvxl/schedule-parser/blob/main/TERMS.md")!) {
                 SettingsLinkLabel(
                     title: "Условия использования",
-                    systemImage: "doc.text.fill"
+                    systemImage: "doc.text.fill",
+                    tint: .blue
                 )
             }
         }
@@ -157,7 +157,8 @@ private extension SettingsView {
             Link(destination: URL(string: "mailto:skyvxl@icloud.com")!) {
                 SettingsLinkLabel(
                     title: "Обратная связь",
-                    systemImage: "envelope.fill"
+                    systemImage: "envelope.fill",
+                    tint: .green
                 )
             }
         }
@@ -174,13 +175,18 @@ private extension SettingsView {
     }
 }
 
+// MARK: - Row Components
+
 private struct SettingsLinkLabel: View {
     let title: String
     let systemImage: String
+    let tint: Color
 
     var body: some View {
-        HStack(spacing: 12) {
-            Label(title, systemImage: systemImage)
+        HStack(spacing: 14) {
+            SettingsIcon(systemImage: systemImage, tint: tint)
+
+            Text(title)
                 .foregroundStyle(.primary)
 
             Spacer(minLength: 8)
@@ -198,11 +204,8 @@ private struct SettingsRowLabel: View {
     let tint: Color
 
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: systemImage)
-                .font(.body.weight(.semibold))
-                .foregroundStyle(tint)
-                .frame(width: 20)
+        HStack(spacing: 14) {
+            SettingsIcon(systemImage: systemImage, tint: tint)
 
             Text(title)
                 .foregroundStyle(.primary)
@@ -217,11 +220,8 @@ private struct SettingsValueRow: View {
     let tint: Color
 
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: systemImage)
-                .font(.body.weight(.semibold))
-                .foregroundStyle(tint)
-                .frame(width: 20)
+        HStack(spacing: 14) {
+            SettingsIcon(systemImage: systemImage, tint: tint)
 
             Text(title)
 
@@ -230,5 +230,18 @@ private struct SettingsValueRow: View {
             Text(value)
                 .foregroundStyle(.secondary)
         }
+    }
+}
+
+private struct SettingsIcon: View {
+    let systemImage: String
+    let tint: Color
+
+    var body: some View {
+        Image(systemName: systemImage)
+            .foregroundStyle(.white)
+            .font(.system(size: 13, weight: .semibold))
+            .frame(width: 28, height: 28)
+            .background(tint, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
     }
 }

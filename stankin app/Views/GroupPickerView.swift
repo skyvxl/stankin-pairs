@@ -1,5 +1,4 @@
 import SwiftUI
-import UIKit
 
 struct GroupPickerView: View {
     @Environment(\.dismiss) private var dismiss
@@ -14,17 +13,13 @@ struct GroupPickerView: View {
     }
 
     private var filteredGroups: [String] {
-        let groups = store.availableGroups.filter { group in
-            group != currentGroup
-        }
+        let groups = store.availableGroups.filter { $0 != currentGroup }
 
         guard !searchText.isEmpty else {
             return groups
         }
 
-        return groups.filter { group in
-            group.localizedCaseInsensitiveContains(searchText)
-        }
+        return groups.filter { $0.localizedCaseInsensitiveContains(searchText) }
     }
 
     var body: some View {
@@ -37,11 +32,7 @@ struct GroupPickerView: View {
                         Button {
                             dismiss()
                         } label: {
-                            GroupRow(
-                                title: currentGroup,
-                                subtitle: "Уже выбрана",
-                                isSelected: true
-                            )
+                            GroupRow(title: currentGroup, isSelected: true)
                         }
                         .buttonStyle(.plain)
                     }
@@ -53,10 +44,15 @@ struct GroupPickerView: View {
             }
             .listStyle(.insetGrouped)
             .scrollContentBackground(.hidden)
-            .overlay {
-                if !store.availableGroups.isEmpty && !searchText.isEmpty && filteredGroups.isEmpty {
-                    ContentUnavailableView.search(text: searchText)
-                }
+        }
+        .searchable(
+            text: $searchText,
+            placement: .navigationBarDrawer(displayMode: .always),
+            prompt: "Поиск группы"
+        )
+        .overlay {
+            if !store.availableGroups.isEmpty && !searchText.isEmpty && filteredGroups.isEmpty {
+                ContentUnavailableView.search(text: searchText)
             }
         }
         .navigationTitle("Выбор группы")
@@ -64,19 +60,11 @@ struct GroupPickerView: View {
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                SheetToolbarIconButton(
-                    systemImage: "xmark",
-                    accessibilityLabel: "Закрыть"
-                ) {
+                Button("Закрыть") {
                     dismiss()
                 }
+                .fontWeight(.semibold)
             }
-        }
-        .safeAreaInset(edge: .bottom) {
-            BottomPinnedSearchField(text: $searchText)
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-                .padding(.bottom, 10)
         }
         .task {
             await store.fetchGroupsIfNeeded()
@@ -112,11 +100,7 @@ private extension GroupPickerView {
                     dismiss()
                     onSelect(group)
                 } label: {
-                    GroupRow(
-                        title: group,
-                        subtitle: "Нажмите, чтобы загрузить",
-                        isSelected: false
-                    )
+                    GroupRow(title: group, isSelected: false)
                 }
                 .buttonStyle(.plain)
             }
@@ -126,81 +110,21 @@ private extension GroupPickerView {
 
 private struct GroupRow: View {
     let title: String
-    let subtitle: String
     let isSelected: Bool
 
     var body: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(.primary)
+        HStack {
+            Text(title)
+                .foregroundStyle(.primary)
 
-                Text(subtitle)
-                    .font(.footnote.weight(.medium))
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer(minLength: 12)
+            Spacer()
 
             if isSelected {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.title3)
+                Image(systemName: "checkmark")
+                    .font(.body.weight(.semibold))
                     .foregroundStyle(Color.accentColor)
             }
         }
         .contentShape(Rectangle())
-    }
-}
-
-private struct BottomPinnedSearchField: View {
-    @Binding var text: String
-
-    var body: some View {
-        StandardSearchBar(text: $text)
-            .frame(height: 44)
-    }
-}
-
-private struct StandardSearchBar: UIViewRepresentable {
-    @Binding var text: String
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(text: $text)
-    }
-
-    func makeUIView(context: Context) -> UISearchBar {
-        let searchBar = UISearchBar(frame: .zero)
-        searchBar.delegate = context.coordinator
-        searchBar.searchBarStyle = .minimal
-        searchBar.placeholder = "Поиск группы"
-        searchBar.returnKeyType = .done
-        searchBar.autocapitalizationType = .none
-        searchBar.autocorrectionType = .no
-        searchBar.accessibilityIdentifier = "group-picker-search"
-        searchBar.searchTextField.accessibilityIdentifier = "group-picker-search-field"
-        return searchBar
-    }
-
-    func updateUIView(_ uiView: UISearchBar, context: Context) {
-        if uiView.text != text {
-            uiView.text = text
-        }
-    }
-
-    final class Coordinator: NSObject, UISearchBarDelegate {
-        @Binding private var text: String
-
-        init(text: Binding<String>) {
-            _text = text
-        }
-
-        func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
-            text = searchText
-        }
-
-        func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
-            searchBar.resignFirstResponder()
-        }
     }
 }

@@ -107,21 +107,16 @@ enum ScheduleCalendar {
         return calendar
     }()
 
+    /// ±2 years — used by the date picker sheet.
     static let pagerDateRange: ClosedRange<Date> = {
         let today = russian.startOfDay(for: Date())
-        let start = russian.date(byAdding: .year, value: -10, to: today) ?? today
-        let end = russian.date(byAdding: .year, value: 10, to: today) ?? today
+        let start = russian.date(byAdding: .year, value: -2, to: today) ?? today
+        let end = russian.date(byAdding: .year, value: 2, to: today) ?? today
         return start...end
     }()
 
-    static let pagerDates: [Date] = {
-        let today = russian.startOfDay(for: Date())
-        let totalDays = 365 * 10
-
-        return (-totalDays...totalDays).compactMap { day in
-            russian.date(byAdding: .day, value: day, to: today)
-        }
-    }()
+    /// Number of days on each side of today for the horizontal pager (±2 years).
+    static let pagerRadius: Int = 365 * 2
 }
 
 enum ScheduleFormatters {
