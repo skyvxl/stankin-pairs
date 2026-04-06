@@ -19,6 +19,10 @@ final class ScheduleStore {
     var isLoading = false
     var isLoadingGroups = false
     private(set) var availableGroups: [String] = []
+    // @ObservationIgnored prevents cache writes from triggering view re-renders.
+    // Without it, every cache-miss write notifies @Observable observers, causing
+    // cascading re-renders that accumulate after settings changes.
+    @ObservationIgnored
     private var dayEntriesCache: [DayEntriesCacheKey: [ScheduleEntry]] = [:]
 
     var hasSchedule: Bool {
@@ -41,7 +45,9 @@ final class ScheduleStore {
         if let fixtureMode = AppLaunchContext.fixtureMode {
             applyFixture(mode: fixtureMode)
         } else {
-            loadCachedSchedule()
+            // Load cache off the main thread so file I/O + JSON decode
+            // don't block the UI on launch.
+            Task { await loadCachedScheduleAsync() }
         }
     }
 
@@ -189,17 +195,18 @@ private extension ScheduleStore {
         try? data.write(to: url, options: .atomic)
     }
 
-    func loadCachedSchedule() {
+    func loadCachedScheduleAsync() async {
         guard let url = cacheURL(),
             FileManager.default.fileExists(atPath: url.path)
-        else {
-            return
-        }
+        else { return }
 
-        if let data = try? Data(contentsOf: url),
-            let cached = GroupSchedule.fromJSON(data)
-        {
-            schedule = cached
-        }
+        // File I/O is the bottleneck — read bytes off the main actor,
+        // then decode on main (Codable conformance requires it here).
+        let data: Data? = await Task.detached(priority: .userInitiated) {
+            try? Data(contentsOf: url)
+        }.value
+
+        guard let data, let cached = GroupSchedule.fromJSON(data) else { return }
+        schedule = cached
     }
 }

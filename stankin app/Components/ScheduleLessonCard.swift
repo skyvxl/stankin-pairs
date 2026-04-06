@@ -13,67 +13,68 @@ struct ScheduleLessonCard: View {
     }
 
     var body: some View {
-        SchedulePanel(style: .plain, cornerRadius: 28, padding: 18) {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .top, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(entry.timeString)
-                            .font(.headline.weight(.semibold))
-                            .monospacedDigit()
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(entry.timeString)
+                        .font(.headline.weight(.semibold))
+                        .monospacedDigit()
 
-                        Text(slotSummary)
-                            .font(.footnote.weight(.medium))
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Spacer(minLength: 12)
-
-                    HStack(spacing: 8) {
-                        SchedulePill(
-                            title: entry.classType.rawValue,
-                            systemImage: nil,
-                            tint: tone.color
-                        )
-
-                        if let progress {
-                            SchedulePill(
-                                title: "\(progress.completed)/\(progress.total)",
-                                systemImage: nil,
-                                tint: .secondary
-                            )
-                        }
-                    }
-                }
-
-                Text(entry.subject)
-                    .font(.title3.weight(.semibold))
-                    .fixedSize(horizontal: false, vertical: true)
-
-                if let teacher = entry.teacher, !teacher.isEmpty {
-                    Text(teacher)
-                        .font(.subheadline.weight(.medium))
+                    Text(slotSummary)
+                        .font(.footnote.weight(.medium))
                         .foregroundStyle(.secondary)
                 }
 
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 8) {
-                        locationPill
+                Spacer(minLength: 12)
 
-                        if entry.subgroup != .all {
-                            subgroupPill
-                        }
+                HStack(spacing: 8) {
+                    SchedulePill(
+                        title: entry.classType.rawValue,
+                        systemImage: nil,
+                        tint: tone.color
+                    )
+
+                    if let progress {
+                        SchedulePill(
+                            title: "\(progress.completed)/\(progress.total)",
+                            systemImage: nil,
+                            tint: .secondary
+                        )
                     }
+                }
+            }
 
-                    VStack(alignment: .leading, spacing: 8) {
-                        locationPill
+            Text(entry.subject)
+                .font(.title3.weight(.semibold))
+                .fixedSize(horizontal: false, vertical: true)
 
-                        if entry.subgroup != .all {
-                            subgroupPill
-                        }
+            if let teacher = entry.teacher, !teacher.isEmpty {
+                Text(teacher)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.secondary)
+            }
+
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) {
+                    locationPill
+
+                    if entry.subgroup != .all {
+                        subgroupPill
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    locationPill
+
+                    if entry.subgroup != .all {
+                        subgroupPill
                     }
                 }
             }
         }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
     }
 }
 

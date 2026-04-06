@@ -6,15 +6,29 @@ struct ScheduleDashboardView: View {
 
     @Binding var selectedDate: Date
 
-    @State private var scrolledDate: Date?
+    @State private var scrolledOffset: Int?
 
-    private var normalizedSelectedDate: Date {
-        calendar.startOfDay(for: selectedDate)
+    private let today: Date = ScheduleCalendar.russian.startOfDay(for: Date())
+    private let pagerRadius: Int = ScheduleCalendar.pagerRadius
+
+    // MARK: - Helpers
+
+    private func pagerDate(at offset: Int) -> Date {
+        calendar.date(byAdding: .day, value: offset, to: today) ?? today
     }
 
-    private var pagerDates: [Date] {
-        ScheduleCalendar.pagerDates
+    private func pagerOffset(for date: Date) -> Int {
+        let days = calendar.dateComponents(
+            [.day], from: today, to: calendar.startOfDay(for: date)
+        ).day ?? 0
+        return max(-pagerRadius, min(pagerRadius, days))
     }
+
+    private var isOnToday: Bool {
+        calendar.isDateInToday(selectedDate)
+    }
+
+    // MARK: - Body
 
     var body: some View {
         VStack(spacing: 0) {
@@ -22,47 +36,60 @@ struct ScheduleDashboardView: View {
                 calendar: calendar,
                 selectedDate: $selectedDate
             )
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
-            .padding(.bottom, 12)
 
             dayPager
+                .safeAreaInset(edge: .bottom) {
+                    if !isOnToday {
+                        HStack {
+                            Spacer()
+                            backToTodayButton
+                            Spacer()
+                        }
+                        .padding(.bottom, 10)
+                        .transition(
+                            .scale(scale: 0.85, anchor: .bottom)
+                            .combined(with: .opacity)
+                        )
+                    }
+                }
+                .animation(
+                    .spring(duration: 0.35, bounce: 0.2),
+                    value: isOnToday
+                )
         }
         .onAppear {
-            scrolledDate = normalizedSelectedDate
+            scrolledOffset = pagerOffset(for: selectedDate)
         }
         .onChange(of: selectedDate) { _, newValue in
-            let normalized = calendar.startOfDay(for: newValue)
-
-            if let scrolledDate,
-                calendar.isDate(scrolledDate, inSameDayAs: normalized)
-            {
-                return
-            }
-
+            let offset = pagerOffset(for: newValue)
+            guard scrolledOffset != offset else { return }
             withAnimation(.snappy(duration: 0.22)) {
-                scrolledDate = normalized
+                scrolledOffset = offset
             }
         }
-        .onChange(of: scrolledDate) { _, newDate in
-            guard let newDate else { return }
-            let normalized = calendar.startOfDay(for: newDate)
-            if !calendar.isDate(normalized, inSameDayAs: selectedDate) {
-                selectedDate = normalized
-            }
+        .onChange(of: scrolledOffset) { _, offset in
+            guard let offset else { return }
+            let newDate = pagerDate(at: offset)
+            guard !calendar.isDate(newDate, inSameDayAs: selectedDate) else { return }
+            selectedDate = newDate
         }
     }
 }
 
+// MARK: - Subviews
+
 private extension ScheduleDashboardView {
+
     var dayPager: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             LazyHStack(spacing: 0) {
-                ForEach(pagerDates, id: \.self) { date in
+                ForEach(-pagerRadius...pagerRadius, id: \.self) { offset in
+                    let date = pagerDate(at: offset)
                     ScheduleDayPage(
                         date: date,
                         entries: store.entries(for: date),
-                        calendar: calendar
+                        calendar: calendar,
+                        extraBottomPadding: !isOnToday
                     )
                     .containerRelativeFrame(.horizontal)
                 }
@@ -70,10 +97,30 @@ private extension ScheduleDashboardView {
             .scrollTargetLayout()
         }
         .scrollTargetBehavior(.paging)
-        .scrollPosition(id: $scrolledDate)
+        .scrollPosition(id: $scrolledOffset)
         .scrollIndicators(.hidden)
     }
+
+    var backToTodayButton: some View {
+        Button {
+            withAnimation(.snappy(duration: 0.3)) {
+                selectedDate = today
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.uturn.backward")
+                    .font(.system(size: 13, weight: .bold))
+                Text("Сегодня")
+                    .font(.subheadline.weight(.semibold))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+        }
+        .buttonStyle(.glass)
+    }
 }
+
+// MARK: - Onboarding
 
 struct ScheduleOnboardingView: View {
     let chooseGroup: () -> Void
@@ -103,23 +150,18 @@ struct ScheduleOnboardingView: View {
         .safeAreaInset(edge: .bottom) {
             Button(action: chooseGroup) {
                 Text("Выбрать группу")
-                    .font(.headline.weight(.semibold))
                     .frame(maxWidth: .infinity)
-                    .frame(height: 52)
-                    .foregroundStyle(.white)
-                    .background(Color.accentColor, in: Capsule())
-                    .overlay {
-                        Capsule()
-                            .strokeBorder(Color.white.opacity(0.18), lineWidth: 0.6)
-                    }
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
             .padding(.horizontal, 20)
             .padding(.top, 12)
             .padding(.bottom, 10)
         }
     }
 }
+
+// MARK: - Week Strip
 
 private struct ScheduleWeekStripBar: View {
     let calendar: Calendar
@@ -131,113 +173,87 @@ private struct ScheduleWeekStripBar: View {
             [.yearForWeekOfYear, .weekOfYear],
             from: selectedDate
         )
-
-        guard let weekStart = calendar.date(from: components) else {
-            return []
-        }
-
-        return (0..<7).compactMap { offset in
-            calendar.date(byAdding: .day, value: offset, to: weekStart)
-        }
+        guard let weekStart = calendar.date(from: components) else { return [] }
+        return (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: weekStart) }
     }
 
     var body: some View {
-        SchedulePanel(style: .card, cornerRadius: 28, padding: 12) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .top, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(
-                            ScheduleFormatters.monthYear
-                                .string(from: selectedDate)
-                                .capitalized
-                        )
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
+        VStack(spacing: 0) {
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(
+                        ScheduleFormatters.monthYear
+                            .string(from: selectedDate)
+                            .capitalized
+                    )
+                    .font(.title2.weight(.bold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+                    .allowsTightening(true)
+
+                    Text(selectedDate.dayHeadline(calendar: calendar))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.72)
-                        .allowsTightening(true)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                        Text(selectedDate.dayHeadline(calendar: calendar))
-                            .font(.system(size: 13, weight: .medium, design: .rounded))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-
-                    HStack(spacing: 8) {
-                        WeekNavigationButton(systemName: "chevron.left") {
-                            moveWeek(by: -1)
-                        }
-
-                        WeekNavigationButton(systemName: "chevron.right") {
-                            moveWeek(by: 1)
-                        }
-                    }
                 }
 
+                Spacer()
+
                 HStack(spacing: 6) {
-                    ForEach(weekDates, id: \.dayID) { date in
-                        WeekChip(
-                            date: date,
-                            calendar: calendar,
-                            isSelected: calendar.isDate(date, inSameDayAs: selectedDate),
-                            isToday: calendar.isDateInToday(date)
-                        ) {
-                            select(date)
-                        }
+                    Button { moveWeek(by: -1) } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 13, weight: .bold))
+                            .frame(width: 32, height: 32)
+                    }
+                    .buttonStyle(.glass)
+
+                    Button { moveWeek(by: 1) } label: {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 13, weight: .bold))
+                            .frame(width: 32, height: 32)
+                    }
+                    .buttonStyle(.glass)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 6)
+            .padding(.bottom, 14)
+
+            HStack(spacing: 0) {
+                ForEach(weekDates, id: \.dayID) { date in
+                    WeekChip(
+                        date: date,
+                        calendar: calendar,
+                        isSelected: calendar.isDate(date, inSameDayAs: selectedDate),
+                        isToday: calendar.isDateInToday(date)
+                    ) {
+                        select(date)
                     }
                 }
             }
+            .padding(.horizontal, 8)
+            .padding(.bottom, 10)
+
+            Divider()
         }
+    }
+
+    private func moveWeek(by value: Int) {
+        guard let next = calendar.date(byAdding: .weekOfYear, value: value, to: selectedDate)
+        else { return }
+        select(next)
+    }
+
+    // No withAnimation here — the onChange in ScheduleDashboardView owns the
+    // scroll animation to avoid stacking two concurrent transactions.
+    private func select(_ date: Date) {
+        selectedDate = calendar.startOfDay(for: date)
     }
 }
 
-private extension ScheduleWeekStripBar {
-    func moveWeek(by value: Int) {
-        guard let nextDate = calendar.date(
-            byAdding: .weekOfYear,
-            value: value,
-            to: selectedDate
-        ) else {
-            return
-        }
-
-        select(nextDate)
-    }
-
-    func select(_ date: Date) {
-        withAnimation(.snappy(duration: 0.22)) {
-            selectedDate = calendar.startOfDay(for: date)
-        }
-    }
-}
-
-private struct WeekNavigationButton: View {
-    @Environment(\.colorScheme) private var colorScheme
-
-    let systemName: String
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(.primary)
-                .frame(width: 36, height: 36)
-                .background(buttonBackground, in: Circle())
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var buttonBackground: Color {
-        colorScheme == .dark
-            ? Color.white.opacity(0.10)
-            : Color.white.opacity(0.75)
-    }
-}
+// MARK: - Week Chip
 
 private struct WeekChip: View {
-    @Environment(\.colorScheme) private var colorScheme
-
     let date: Date
     let calendar: Calendar
     let isSelected: Bool
@@ -246,130 +262,89 @@ private struct WeekChip: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 3) {
+            VStack(spacing: 4) {
+                // Day abbreviation — uses accentColor for selected so it's
+                // visible on both light (white) and dark (black) backgrounds.
                 Text(
                     ScheduleFormatters.shortWeekday
                         .string(from: date)
                         .lowercased()
                 )
-                .font(.system(size: 11, weight: .semibold, design: .rounded))
-                .foregroundStyle(weekdayColor)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(labelColor)
 
-                Text("\(calendar.component(.day, from: date))")
-                    .font(.system(size: 18, weight: .bold, design: .rounded))
-                    .foregroundStyle(numberColor)
-                    .monospacedDigit()
+                ZStack {
+                    // Squircle background for selected day — consistent with
+                    // the card cornerRadius language used throughout the app.
+                    if isSelected {
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Color.accentColor)
+                            .frame(width: 36, height: 36)
+                    }
+
+                    Text("\(calendar.component(.day, from: date))")
+                        .font(.system(size: 20, weight: isSelected ? .bold : .regular))
+                        .foregroundStyle(numberColor)
+                        .monospacedDigit()
+                }
+                .frame(width: 36, height: 36)
+
+                // Today indicator — a small dot below the number.
+                Circle()
+                    .fill(isToday && !isSelected ? Color.accentColor : Color.clear)
+                    .frame(width: 5, height: 5)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 56)
-            .background(background, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(borderColor, lineWidth: 0.8)
-            }
+            .padding(.vertical, 4)
         }
         .buttonStyle(.plain)
     }
 
-    private var background: Color {
-        if isSelected {
-            return Color.accentColor.opacity(colorScheme == .dark ? 0.20 : 0.14)
-        }
-
-        return colorScheme == .dark
-            ? Color.white.opacity(0.05)
-            : Color.black.opacity(0.03)
-    }
-
-    private var borderColor: Color {
-        if isSelected {
-            return Color.white.opacity(colorScheme == .dark ? 0.16 : 0.72)
-        }
-
-        if isToday {
-            return Color.accentColor.opacity(colorScheme == .dark ? 0.18 : 0.22)
-        }
-
-        return colorScheme == .dark
-            ? Color.white.opacity(0.04)
-            : Color.white.opacity(0.72)
-    }
-
-    private var weekdayColor: Color {
-        if isSelected {
-            return selectedSecondary
-        }
-
-        return isToday ? .accentColor : .secondary
+    private var labelColor: Color {
+        // White is invisible on light-theme background — use accentColor instead.
+        if isSelected || isToday { return .accentColor }
+        return .secondary
     }
 
     private var numberColor: Color {
-        if isSelected {
-            return .primary
-        }
-
-        return isToday ? .accentColor : .primary
-    }
-
-    private var selectedSecondary: Color {
-        colorScheme == .dark ? .white.opacity(0.72) : .primary.opacity(0.6)
+        if isSelected { return .white }
+        if isToday { return .accentColor }
+        return .primary
     }
 }
+
+// MARK: - Day Page
 
 private struct ScheduleDayPage: View {
     let date: Date
     let entries: [ScheduleEntry]
     let calendar: Calendar
+    // When the "Back to Today" button is visible, add extra bottom padding
+    // so the last card is never hidden behind the floating button.
+    let extraBottomPadding: Bool
 
     var body: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 14) {
-                DayHeader(date: date, entries: entries, calendar: calendar)
-
+            VStack(alignment: .leading, spacing: 14) {
                 if entries.isEmpty {
                     DayEmptyState(date: date, calendar: calendar)
+                        .padding(.top, 8)
                 } else {
-                    ForEach(entries) { entry in
-                        ScheduleLessonCard(entry: entry, date: date)
+                    GlassEffectContainer(spacing: 14) {
+                        VStack(spacing: 14) {
+                            ForEach(entries) { entry in
+                                ScheduleLessonCard(entry: entry, date: date)
+                            }
+                        }
                     }
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.top, 2)
-            .padding(.bottom, 36)
+            .padding(.top, 14)
+            .padding(.bottom, extraBottomPadding ? 80 : 36)
         }
+        .scrollEdgeEffectStyle(.soft, for: .bottom)
         .scrollIndicators(.hidden)
-    }
-}
-
-private struct DayHeader: View {
-    let date: Date
-    let entries: [ScheduleEntry]
-    let calendar: Calendar
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(date.dayHeadline(calendar: calendar))
-                    .font(.title2.weight(.bold))
-
-                Text(
-                    ScheduleFormatters.fullDate
-                        .string(from: date)
-                        .capitalized
-                )
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(.secondary)
-            }
-
-            Spacer(minLength: 12)
-
-            Text(lessonCountText(entries.count))
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
-        }
-        .padding(.horizontal, 2)
-        .padding(.bottom, 2)
     }
 }
 
@@ -388,8 +363,8 @@ private struct DayEmptyState: View {
 
             Text(
                 calendar.isDateInToday(date)
-                    ? "Выберите другой день в верхнем блоке."
-                    : "Переключитесь на соседний день в верхнем блоке."
+                    ? "Выберите другой день выше."
+                    : "Переключитесь на соседний день."
             )
             .font(.subheadline)
             .foregroundStyle(.secondary)
@@ -398,7 +373,7 @@ private struct DayEmptyState: View {
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 24)
         .padding(.vertical, 48)
-        .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
     }
 }
 
