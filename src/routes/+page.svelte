@@ -1,6 +1,7 @@
 <script lang="ts">
   import { browser } from '$app/environment';
   import { onMount } from 'svelte';
+  import { fly } from 'svelte/transition';
   import type { GroupSchedule, ScheduleEntry, Subgroup, ThemeMode } from '$lib/types';
   import { fetchGroups, fetchSchedule } from '$lib/api';
   import { dayLabel, monthLabel, toISODate, weekDates } from '$lib/date';
@@ -297,6 +298,18 @@
         </div>
       </div>
     </div>
+  {/if}
+
+  {#if schedule && selectedISO !== todayISO}
+    <button
+      transition:fly={{ y: 16, duration: 200 }}
+      class="fixed bottom-6 left-1/2 z-10 flex -translate-x-1/2 cursor-pointer items-center gap-1.5 rounded-full bg-zinc-900/90 px-4 py-2.5 text-sm font-medium text-white shadow-lg backdrop-blur-sm transition-shadow hover:shadow-xl dark:bg-zinc-100/90 dark:text-zinc-900"
+      onclick={() => (selectedDate = new Date())}
+      aria-label="Вернуться на сегодня"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      Сегодня
+    </button>
   {/if}
 
   {#if showSettings}
