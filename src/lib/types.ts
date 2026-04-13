@@ -25,7 +25,7 @@ export interface GroupSchedule {
 interface ApiEntry {
   name: string;
   type_: string;
-  sub_group?: 'А' | 'Б';
+  sub_group?: string;
   teacher?: string[];
   office?: string;
   time: { start: string; end: string }[];

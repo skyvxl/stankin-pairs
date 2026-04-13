@@ -54,7 +54,8 @@ export async function fetchSchedule(group: string): Promise<GroupSchedule> {
       if (slotStart === undefined) return null;
 
       const slotEnd = Number(Object.keys(SLOT_END).find((key) => SLOT_END[Number(key)] === end) ?? slotStart);
-      const subgroup = entry.sub_group === 'А' ? 'a' : entry.sub_group === 'Б' ? 'b' : 'all';
+      const sg = entry.sub_group ?? '';
+      const subgroup = /А/i.test(sg) ? 'a' : /Б/i.test(sg) ? 'b' : 'all';
       const classType = entry.type_ === 'Лабораторная работа' ? 'Лабораторная' : (entry.type_ as ScheduleEntry['classType']);
 
       const mapped: ScheduleEntry = {

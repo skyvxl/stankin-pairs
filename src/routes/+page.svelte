@@ -23,10 +23,15 @@
   const SUBGROUP_KEY = 'pairs_subgroup_v1';
   const THEME_KEY = 'pairs_theme_v1';
 
+  function normalizeQuery(s: string): string {
+    return s.toUpperCase().replace(/[^А-ЯA-Z0-9]/g, '');
+  }
+
   const filteredGroups = $derived.by(() => {
-    const query = search.trim().toLowerCase();
-    if (!query) return groups.filter((group) => group !== selectedGroup);
-    return groups.filter((group) => group !== selectedGroup && group.toLowerCase().includes(query));
+    const raw = search.trim();
+    if (!raw) return groups.filter((g) => g !== selectedGroup);
+    const q = normalizeQuery(raw);
+    return groups.filter((g) => g !== selectedGroup && normalizeQuery(g).includes(q));
   });
 
   const entries = $derived.by(() => {
@@ -141,6 +146,26 @@
     localStorage.setItem(THEME_KEY, theme);
     applyTheme(theme);
   });
+
+  function classTypeBadgeClass(type: import('$lib/types').ClassType): string {
+    const base = 'rounded-full px-2.5 py-1 text-xs font-medium';
+    if (type === 'Семинар') return `${base} bg-orange-100 text-orange-700 dark:bg-orange-950/60 dark:text-orange-300`;
+    if (type === 'Лабораторная') return `${base} bg-green-100 text-green-700 dark:bg-green-950/60 dark:text-green-300`;
+    return `${base} bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300`;
+  }
+
+  function slotLabel(start: number, end: number): string {
+    const s = start + 1;
+    const e = end + 1;
+    if (s === e) return `${s}-я пара`;
+    return `${s}–${e}-я пары`;
+  }
+
+  function weekCounter(entry: ScheduleEntry, dateISO: string): string {
+    const idx = entry.dates.indexOf(dateISO);
+    if (idx === -1 || entry.dates.length < 2) return '';
+    return `${idx + 1}/${entry.dates.length}`;
+  }
 </script>
 
 <main class="mx-auto flex min-h-dvh w-full max-w-md flex-col px-4 pb-6 pt-3">
@@ -152,7 +177,9 @@
       </div>
       <div class="flex gap-2">
         <button class="rounded-xl border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700" onclick={() => (showGroupPicker = true)}>Группа</button>
-        <button class="rounded-xl border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700" onclick={() => (showSettings = true)}>⚙️</button>
+        <button class="rounded-xl border border-zinc-300 px-3 py-2 dark:border-zinc-700" aria-label="Настройки" onclick={() => (showSettings = true)}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
       </div>
     </div>
   </header>
@@ -189,12 +216,50 @@
         <div class="rounded-2xl border border-dashed border-zinc-300 p-6 text-center text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">В этот день пар нет.</div>
       {:else}
         {#each entries as entry}
-          <article class="rounded-2xl border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900">
-            <p class="text-sm text-zinc-500 dark:text-zinc-400">{entry.timeString}</p>
-            <h3 class="mt-1 font-semibold">{entry.subject}</h3>
-            <p class="mt-1 text-sm">{entry.classType} · {entry.subgroup === 'all' ? 'Все' : `Подгруппа ${entry.subgroup}`}</p>
-            {#if entry.teacher}<p class="mt-1 text-sm text-zinc-600 dark:text-zinc-300">{entry.teacher}</p>{/if}
-            <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{entry.room ?? 'Дистанционно'}</p>
+          {@const counter = weekCounter(entry, selectedISO)}
+          <article class="rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+            <!-- Header: time + badges -->
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <p class="text-lg font-bold leading-tight">{entry.timeString}</p>
+                <p class="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">{slotLabel(entry.slotStart, entry.slotEnd)}</p>
+              </div>
+              <div class="flex shrink-0 items-center gap-1.5">
+                <span class={classTypeBadgeClass(entry.classType)}>{entry.classType}</span>
+                {#if counter}
+                  <span class="rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">{counter}</span>
+                {/if}
+              </div>
+            </div>
+
+            <!-- Subject -->
+            <h3 class="mt-3 text-base font-bold leading-snug">{entry.subject}</h3>
+
+            <!-- Teacher -->
+            {#if entry.teacher}
+              <p class="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400">{entry.teacher}</p>
+            {/if}
+
+            <!-- Bottom meta badges -->
+            <div class="mt-3 flex flex-wrap gap-1.5">
+              {#if entry.room}
+                <span class="flex items-center gap-1 rounded-full bg-zinc-100 px-2.5 py-1 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22V12h6v10"/><path d="M8 7h.01"/><path d="M12 7h.01"/><path d="M16 7h.01"/></svg>
+                  {entry.room}
+                </span>
+              {:else}
+                <span class="flex items-center gap-1 rounded-full bg-zinc-100 px-2.5 py-1 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 8-6 4 6 4V8z"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>
+                  Дистанционно
+                </span>
+              {/if}
+              {#if entry.subgroup !== 'all'}
+                <span class="flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-1 text-xs text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                  Подгруппа {entry.subgroup.toUpperCase()}
+                </span>
+              {/if}
+            </div>
           </article>
         {/each}
       {/if}
@@ -259,6 +324,21 @@
             <button class="flex-1 rounded-xl border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700" onclick={() => loadSchedule(selectedGroup)}>Обновить</button>
           {/if}
           <button class="flex-1 rounded-xl bg-red-600 px-3 py-2 text-sm text-white" onclick={removeSchedule}>Удалить</button>
+        </div>
+
+        <div class="mt-4 border-t border-zinc-200 pt-4 dark:border-zinc-800">
+          <p class="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Документы</p>
+          <div class="overflow-hidden rounded-2xl border border-zinc-200 dark:border-zinc-800">
+            <a href="/legal/privacy" onclick={() => (showSettings = false)} class="flex items-center justify-between px-4 py-3 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800">
+              Политика конфиденциальности
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-400"><path d="m9 18 6-6-6-6"/></svg>
+            </a>
+            <div class="mx-4 h-px bg-zinc-100 dark:bg-zinc-800"></div>
+            <a href="/legal/terms" onclick={() => (showSettings = false)} class="flex items-center justify-between px-4 py-3 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800">
+              Условия использования
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-400"><path d="m9 18 6-6-6-6"/></svg>
+            </a>
+          </div>
         </div>
       </div>
     </div>
