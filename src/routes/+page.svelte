@@ -1,6 +1,8 @@
 <script lang="ts">
   import { browser } from '$app/environment';
+  import { resolve } from '$app/paths';
   import { onMount } from 'svelte';
+  import { SvelteDate } from 'svelte/reactivity';
   import { fly } from 'svelte/transition';
   import type { GroupSchedule, ScheduleEntry, Subgroup, ThemeMode } from '$lib/types';
   import { fetchGroups, fetchSchedule } from '$lib/api';
@@ -11,13 +13,15 @@
   let isLoading = $state(false);
   let isLoadingGroups = $state(false);
   let error = $state('');
-  let selectedDate = $state(new Date());
+  const selectedDate = new SvelteDate();
   let selectedSubgroup = $state<Subgroup>('all');
   let selectedGroup = $state('');
   let search = $state('');
   let showGroupPicker = $state(false);
   let showSettings = $state(false);
+  let showDatePicker = $state(false);
   let theme = $state<ThemeMode>('system');
+  const pickerMonth = new SvelteDate(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
 
   const CACHE_KEY = 'pairs_schedule_cache_v1';
   const GROUP_KEY = 'pairs_group_v1';
@@ -44,12 +48,14 @@
       .sort((a, b) => a.slotStart - b.slotStart);
   });
 
-  const week = $derived(weekDates(selectedDate));
+  const week = $derived.by(() => weekDates(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate())));
 
   const todayISO = toISODate(new Date());
   const selectedISO = $derived(toISODate(selectedDate));
 
   const title = $derived(schedule?.groupName ?? 'Расписание');
+  const calendarDays = $derived.by(() => buildCalendarDays(pickerMonth));
+  const weekdays = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'];
 
   function applyTheme(mode: ThemeMode) {
     if (!browser) return;
@@ -59,9 +65,39 @@
   }
 
   function shiftDay(days: number) {
-    const next = new Date(selectedDate);
-    next.setDate(next.getDate() + days);
-    selectedDate = next;
+    selectedDate.setDate(selectedDate.getDate() + days);
+  }
+
+  function openDatePicker() {
+    pickerMonth.setFullYear(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+    showDatePicker = !showDatePicker;
+  }
+
+  function shiftPickerMonth(months: number) {
+    pickerMonth.setMonth(pickerMonth.getMonth() + months, 1);
+  }
+
+  function setSelectedDate(date: Date) {
+    selectedDate.setTime(date.getTime());
+  }
+
+  function chooseCalendarDate(date: Date) {
+    setSelectedDate(date);
+    showDatePicker = false;
+  }
+
+  function buildCalendarDays(monthDate: Date): Array<Date | null> {
+    const year = monthDate.getFullYear();
+    const month = monthDate.getMonth();
+    const firstOffset = (new Date(year, month, 1).getDay() + 6) % 7;
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const days: Array<Date | null> = Array(firstOffset).fill(null);
+
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      days.push(new Date(year, month, day));
+    }
+
+    return days;
   }
 
   async function loadGroups() {
@@ -192,20 +228,52 @@
       <button class="mt-4 w-full rounded-2xl bg-zinc-900 px-4 py-3 text-white dark:bg-white dark:text-zinc-900" onclick={() => (showGroupPicker = true)}>Выбрать группу</button>
     </section>
   {:else}
-    <section class="mt-3 flex items-center justify-between rounded-2xl border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900">
+    <section class="relative mt-3 flex items-center justify-between rounded-2xl border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900">
       <button class="rounded-xl border border-zinc-300 px-3 py-2 dark:border-zinc-700" onclick={() => shiftDay(-1)}>←</button>
-      <div class="text-center">
+      <button class="mx-auto rounded-xl px-2 py-1 text-center focus:outline-none focus:ring-2 focus:ring-zinc-400 dark:focus:ring-zinc-600" aria-expanded={showDatePicker} aria-label="Открыть календарь" onclick={openDatePicker}>
         <p class="text-sm font-medium">{dayLabel(selectedDate)}</p>
         <p class="text-xs text-zinc-500 dark:text-zinc-400">{selectedISO === todayISO ? 'Сегодня' : 'Выбранный день'}</p>
-      </div>
+      </button>
       <button class="rounded-xl border border-zinc-300 px-3 py-2 dark:border-zinc-700" onclick={() => shiftDay(1)}>→</button>
+
+      {#if showDatePicker}
+        <div class="absolute left-0 right-0 top-full z-20 mt-2 rounded-2xl border border-zinc-200 bg-white p-3 text-zinc-950 shadow-xl dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-50">
+          <div class="mb-3 flex items-center justify-between">
+            <button class="rounded-xl border border-zinc-300 px-3 py-2 dark:border-zinc-700" aria-label="Предыдущий месяц" onclick={() => shiftPickerMonth(-1)}>←</button>
+            <p class="text-sm font-semibold">{monthLabel(pickerMonth)}</p>
+            <button class="rounded-xl border border-zinc-300 px-3 py-2 dark:border-zinc-700" aria-label="Следующий месяц" onclick={() => shiftPickerMonth(1)}>→</button>
+          </div>
+
+          <div class="mb-1 grid grid-cols-7 text-center text-xs text-zinc-500 dark:text-zinc-400">
+            {#each weekdays as weekday (weekday)}
+              <span>{weekday}</span>
+            {/each}
+          </div>
+
+          <div class="grid grid-cols-7 gap-1 text-center text-sm">
+            {#each calendarDays as day, index (day ? toISODate(day) : `blank-${index}`)}
+              {#if day}
+                {@const dayISO = toISODate(day)}
+                <button
+                  class={`rounded-xl px-1 py-2 ${dayISO === selectedISO ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900' : dayISO === todayISO ? 'bg-zinc-100 font-semibold dark:bg-zinc-800' : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}
+                  onclick={() => chooseCalendarDate(day)}
+                >
+                  {day.getDate()}
+                </button>
+              {:else}
+                <span aria-hidden="true"></span>
+              {/if}
+            {/each}
+          </div>
+        </div>
+      {/if}
     </section>
 
     <div class="mt-2 grid grid-cols-7 gap-1 text-center text-xs">
-      {#each week as day}
+      {#each week as day (toISODate(day))}
         <button
           class={`rounded-xl px-1 py-2 ${toISODate(day) === selectedISO ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900' : 'bg-zinc-200/70 dark:bg-zinc-800'}`}
-          onclick={() => (selectedDate = day)}
+          onclick={() => setSelectedDate(day)}
         >
           {day.toLocaleDateString('ru-RU', { weekday: 'short' })}<br />{day.getDate()}
         </button>
@@ -216,7 +284,7 @@
       {#if entries.length === 0}
         <div class="rounded-2xl border border-dashed border-zinc-300 p-6 text-center text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">В этот день пар нет.</div>
       {:else}
-        {#each entries as entry}
+        {#each entries as entry (entry.id)}
           {@const counter = weekCounter(entry, selectedISO)}
           <article class="rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
             <!-- Header: time + badges -->
@@ -291,7 +359,7 @@
           {:else if filteredGroups.length === 0}
             <p class="p-3 text-sm text-zinc-500">Ничего не найдено.</p>
           {:else}
-            {#each filteredGroups as group}
+            {#each filteredGroups as group (group)}
               <button class="mb-1 w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800" onclick={() => loadSchedule(group)}>{group}</button>
             {/each}
           {/if}
@@ -304,7 +372,7 @@
     <button
       transition:fly={{ y: 16, duration: 200 }}
       class="fixed bottom-6 left-1/2 z-10 flex -translate-x-1/2 cursor-pointer items-center gap-1.5 rounded-full bg-zinc-900/90 px-4 py-2.5 text-sm font-medium text-white shadow-lg backdrop-blur-sm transition-shadow hover:shadow-xl dark:bg-zinc-100/90 dark:text-zinc-900"
-      onclick={() => (selectedDate = new Date())}
+      onclick={() => selectedDate.setTime(Date.now())}
       aria-label="Вернуться на сегодня"
     >
       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
@@ -342,12 +410,12 @@
         <div class="mt-4 border-t border-zinc-200 pt-4 dark:border-zinc-800">
           <p class="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Документы</p>
           <div class="overflow-hidden rounded-2xl border border-zinc-200 dark:border-zinc-800">
-            <a href="/legal/privacy" onclick={() => (showSettings = false)} class="flex items-center justify-between px-4 py-3 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800">
+            <a href={resolve('/legal/privacy')} onclick={() => (showSettings = false)} class="flex items-center justify-between px-4 py-3 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800">
               Политика конфиденциальности
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-400"><path d="m9 18 6-6-6-6"/></svg>
             </a>
             <div class="mx-4 h-px bg-zinc-100 dark:bg-zinc-800"></div>
-            <a href="/legal/terms" onclick={() => (showSettings = false)} class="flex items-center justify-between px-4 py-3 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800">
+            <a href={resolve('/legal/terms')} onclick={() => (showSettings = false)} class="flex items-center justify-between px-4 py-3 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800">
               Условия использования
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-400"><path d="m9 18 6-6-6-6"/></svg>
             </a>
