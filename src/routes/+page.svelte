@@ -23,7 +23,8 @@
   let theme = $state<ThemeMode>('system');
   const pickerMonth = new SvelteDate(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
 
-  const CACHE_KEY = 'pairs_schedule_cache_v1';
+  const CACHE_KEY = 'pairs_schedule_cache_v2';
+  const LEGACY_CACHE_KEY = 'pairs_schedule_cache_v1';
   const GROUP_KEY = 'pairs_group_v1';
   const SUBGROUP_KEY = 'pairs_subgroup_v1';
   const THEME_KEY = 'pairs_theme_v1';
@@ -112,8 +113,9 @@
     }
   }
 
-  async function loadSchedule(group: string) {
-    isLoading = true;
+  async function loadSchedule(group: string, options: { silent?: boolean } = {}) {
+    const silent = options.silent ?? false;
+    if (!silent) isLoading = true;
     error = '';
     try {
       const data = await fetchSchedule(group);
@@ -121,13 +123,14 @@
       selectedGroup = group;
       if (browser) {
         localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+        localStorage.removeItem(LEGACY_CACHE_KEY);
         localStorage.setItem(GROUP_KEY, group);
       }
       showGroupPicker = false;
     } catch {
-      error = 'Не удалось загрузить расписание';
+      if (!silent || !schedule) error = 'Не удалось загрузить расписание';
     } finally {
-      isLoading = false;
+      if (!silent) isLoading = false;
     }
   }
 
@@ -137,6 +140,7 @@
     selectedSubgroup = 'all';
     if (browser) {
       localStorage.removeItem(CACHE_KEY);
+      localStorage.removeItem(LEGACY_CACHE_KEY);
       localStorage.removeItem(GROUP_KEY);
       localStorage.setItem(SUBGROUP_KEY, 'all');
     }
@@ -145,7 +149,7 @@
 
   onMount(async () => {
     if (browser) {
-      const cached = localStorage.getItem(CACHE_KEY);
+      const cached = localStorage.getItem(CACHE_KEY) ?? localStorage.getItem(LEGACY_CACHE_KEY);
       const savedGroup = localStorage.getItem(GROUP_KEY) ?? '';
       const savedSubgroup = (localStorage.getItem(SUBGROUP_KEY) as Subgroup | null) ?? 'all';
       const savedTheme = (localStorage.getItem(THEME_KEY) as ThemeMode | null) ?? 'system';
@@ -168,8 +172,8 @@
 
     await loadGroups();
 
-    if (!schedule && selectedGroup) {
-      await loadSchedule(selectedGroup);
+    if (selectedGroup) {
+      await loadSchedule(selectedGroup, { silent: Boolean(schedule) });
     }
   });
 
