@@ -241,7 +241,7 @@
       <button class="rounded-xl border border-zinc-300 px-3 py-2 dark:border-zinc-700" onclick={() => shiftDay(1)}>→</button>
 
       {#if showDatePicker}
-        <div class="absolute left-0 right-0 top-full z-20 mt-2 rounded-2xl border border-zinc-200 bg-white p-3 text-zinc-950 shadow-xl dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-50">
+        <div class="absolute left-0 right-0 top-0 z-20 rounded-2xl border border-zinc-200 bg-white p-3 text-zinc-950 shadow-xl dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-50">
           <div class="mb-3 flex items-center justify-between">
             <button class="rounded-xl border border-zinc-300 px-3 py-2 dark:border-zinc-700" aria-label="Предыдущий месяц" onclick={() => shiftPickerMonth(-1)}>←</button>
             <p class="text-sm font-semibold">{monthLabel(pickerMonth)}</p>
