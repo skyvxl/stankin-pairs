@@ -20,6 +20,7 @@
   let showGroupPicker = $state(false);
   let showSettings = $state(false);
   let showDatePicker = $state(false);
+  let datePickerArea = $state<HTMLElement>();
   let theme = $state<ThemeMode>('system');
   const pickerMonth = new SvelteDate(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
 
@@ -85,6 +86,12 @@
   function chooseCalendarDate(date: Date) {
     setSelectedDate(date);
     showDatePicker = false;
+  }
+
+  function closeDatePickerOnOutsidePointer(event: PointerEvent) {
+    if (showDatePicker && datePickerArea && !datePickerArea.contains(event.target as Node)) {
+      showDatePicker = false;
+    }
   }
 
   function buildCalendarDays(monthDate: Date): Array<Date | null> {
@@ -209,6 +216,8 @@
   }
 </script>
 
+<svelte:window onpointerdown={closeDatePickerOnOutsidePointer} />
+
 <main class="mx-auto flex min-h-dvh w-full max-w-md flex-col px-4 pb-6 pt-3">
   <header class="sticky top-0 z-10 rounded-2xl bg-zinc-100/95 p-3 backdrop-blur dark:bg-zinc-950/95">
     <div class="flex items-center justify-between gap-2">
@@ -232,7 +241,7 @@
       <button class="mt-4 w-full rounded-2xl bg-zinc-900 px-4 py-3 text-white dark:bg-white dark:text-zinc-900" onclick={() => (showGroupPicker = true)}>Выбрать группу</button>
     </section>
   {:else}
-    <section class="relative mt-3 flex items-center justify-between rounded-2xl border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900">
+    <section bind:this={datePickerArea} class="relative mt-3 flex items-center justify-between rounded-2xl border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900">
       <button class="rounded-xl border border-zinc-300 px-3 py-2 dark:border-zinc-700" onclick={() => shiftDay(-1)}>←</button>
       <button class="mx-auto rounded-xl px-2 py-1 text-center focus:outline-none focus:ring-2 focus:ring-zinc-400 dark:focus:ring-zinc-600" aria-expanded={showDatePicker} aria-label="Открыть календарь" onclick={openDatePicker}>
         <p class="text-sm font-medium">{dayLabel(selectedDate)}</p>
